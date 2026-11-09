@@ -7,3 +7,16 @@ services:
       - .env
     environment:
       CORS_ORIGINS: '["http://localhost:5173"]'
+      REDIS_URL: redis://redis:6379/0
+    depends_on:
+      - redis
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+
+volumes:
+  redis_data:

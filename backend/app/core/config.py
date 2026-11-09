@@ -14,6 +14,8 @@ class Settings(BaseSettings):
     api_prefix: str = "/api"
     cors_origins: list[str] = ["http://localhost:5173"]
 
+    redis_url: str = "redis://localhost:6379/0"
+
     github_webhook_secret: str = ""
 
 
