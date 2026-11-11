@@ -1,0 +1,16 @@
+from typing import Any, Protocol
+
+
+class CachePort(Protocol):
+    """Cache of JSON-serializable values. A stored value of None is not supported,
+    because None means a cache miss."""
+
+    async def get(self, key: str) -> Any | None: ...
+
+    async def set(self, key: str, value: Any, ttl_seconds: int | None = None) -> None: ...
+
+    async def delete(self, key: str) -> None: ...
+
+    async def ping(self) -> bool: ...
+
+    async def close(self) -> None: ...
