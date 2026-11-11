@@ -15,6 +15,8 @@ class Settings(BaseSettings):
     cors_origins: list[str] = ["http://localhost:5173"]
 
     redis_url: str = "redis://localhost:6379/0"
+    cache_backend: Literal["redis", "memory"] = "redis"
+    cache_ttl_seconds: int = 86400
 
     github_webhook_secret: str = ""
 
