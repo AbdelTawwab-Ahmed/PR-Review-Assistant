@@ -1,6 +1,7 @@
 from functools import lru_cache
 from typing import Literal
 
+from pydantic import SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -18,7 +19,10 @@ class Settings(BaseSettings):
     cache_backend: Literal["redis", "memory"] = "redis"
     cache_ttl_seconds: int = 86400
 
-    github_webhook_secret: str = ""
+    github_webhook_secret: SecretStr = SecretStr("")
+    github_token: SecretStr = SecretStr("")
+    github_api_url: str = "https://api.github.com"
+    github_bot_login: str = ""
 
 
 @lru_cache
