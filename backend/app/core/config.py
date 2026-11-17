@@ -1,5 +1,6 @@
 from functools import lru_cache
 from typing import Literal
+from pydantic import SecretStr
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -19,6 +20,21 @@ class Settings(BaseSettings):
     cache_ttl_seconds: int = 86400
 
     github_webhook_secret: str = ""
+
+        # Azure OpenAI Configuration
+    azure_openai_endpoint: str = ""
+    azure_openai_api_key: SecretStr = SecretStr("")
+    azure_openai_api_version: str = "2025-04-01-preview"
+    azure_openai_deployment_strong: str = ""
+    azure_openai_deployment_fast: str = ""
+
+    # LLM Configuration
+    llm_timeout_seconds: float = 60.0
+    llm_max_concurrency: int = 4
+
+    # Review Configuration
+    review_chunk_chars: int = 24000
+    review_max_chunks: int = 8
 
 
 @lru_cache

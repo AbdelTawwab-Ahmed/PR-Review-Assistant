@@ -8,7 +8,7 @@ from app.core.config import get_settings
 from app.core.errors import register_error_handlers
 from app.core.logging import configure_logging
 from app.infrastructure.cache.cache import build_cache
-from app.interfaces.api.routers import health
+from app.interfaces.api.routers import dev, health, webhooks
 
 
 @asynccontextmanager
@@ -35,7 +35,13 @@ def create_app() -> FastAPI:
     )
     register_error_handlers(app)
     app.include_router(health.router, prefix=settings.api_prefix)
+    app.include_router(webhooks.router, prefix=settings.api_prefix)
+
+    if settings.environment == "development":
+        app.include_router(dev.router, prefix=settings.api_prefix)
+
     return app
+
 
 
 app = create_app()
