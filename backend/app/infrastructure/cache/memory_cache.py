@@ -41,3 +41,9 @@ class InMemoryCache:
 
     async def close(self) -> None:
         self._data.clear()
+
+    async def set_if_absent(self, key: str, value: Any, ttl_seconds: int | None = None) -> bool:
+        if await self.get(key) is not None:
+            return False
+        await self.set(key, value, ttl_seconds)
+        return True

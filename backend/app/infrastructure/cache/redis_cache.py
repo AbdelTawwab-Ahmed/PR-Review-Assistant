@@ -79,3 +79,31 @@ class RedisCache:
 
     async def close(self) -> None:
         await self._client.aclose()
+
+    async def set_if_absent(
+        self,
+        key: str,
+        value: Any,
+        ttl_seconds: int | None = None,
+    ) -> bool:
+        payload = json.dumps(value)
+
+        try:
+            stored = await self._client.set(
+                self._k(key),
+                payload,
+                ex=ttl_seconds,
+                nx=True,
+            )
+        except Exception as exc:
+            if not _is_redis_error(exc):
+                raise
+
+            logger.warning(
+                "cache set_if_absent failed for %s",
+                key,
+                exc_info=True,
+            )
+            return True
+
+        return bool(stored)

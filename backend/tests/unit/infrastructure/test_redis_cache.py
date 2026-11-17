@@ -61,3 +61,11 @@ async def test_redis_outage_fails_open() -> None:
     await cache.set("k", "v")
     await cache.delete("k")
     assert await cache.ping() is False
+    assert await cache.set_if_absent("k", 1) is True
+
+
+async def test_set_if_absent(client) -> None:
+    cache = RedisCache(client)
+    assert await cache.set_if_absent("k", 1, ttl_seconds=60) is True
+    assert await cache.set_if_absent("k", 2, ttl_seconds=60) is False
+    assert await cache.get("k") == 1
