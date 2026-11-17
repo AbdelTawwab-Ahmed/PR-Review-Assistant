@@ -1,3 +1,4 @@
+
 from dataclasses import dataclass
 
 from app.application.ports.cache_port import CachePort
@@ -29,12 +30,14 @@ class Container:
 
 def build_container(settings: Settings) -> Container:
     cache = build_cache(settings)
+
     github = GitHubClient(
         token=settings.github_token.get_secret_value(),
         api_url=settings.github_api_url,
         cache=cache,
         cache_ttl_seconds=settings.cache_ttl_seconds,
     )
+
     handle_pr_event = HandlePullRequestEvent(
         cache,
         LoggingRunDispatcher(),
@@ -43,6 +46,7 @@ def build_container(settings: Settings) -> Container:
     )
 
     tracker = TokenTracker()
+
     llm = AzureOpenAILLM(
         endpoint=settings.azure_openai_endpoint,
         api_key=settings.azure_openai_api_key,
@@ -55,6 +59,7 @@ def build_container(settings: Settings) -> Container:
         timeout_seconds=settings.llm_timeout_seconds,
         max_concurrency=settings.llm_max_concurrency,
     )
+
     graph = build_analysis_graph(
         WorkflowDeps(
             github=github,
@@ -63,6 +68,7 @@ def build_container(settings: Settings) -> Container:
             max_chunks=settings.review_max_chunks,
         )
     )
+
     return Container(
         cache=cache,
         github=github,

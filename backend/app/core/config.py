@@ -1,12 +1,17 @@
+
 from functools import lru_cache
 from typing import Literal
-from pydantic import SecretStr
 
+from pydantic import SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        extra="ignore",
+    )
 
     app_name: str = "PR-Review-Assistant"
     environment: Literal["development", "production", "test"] = "development"
@@ -15,13 +20,18 @@ class Settings(BaseSettings):
     api_prefix: str = "/api"
     cors_origins: list[str] = ["http://localhost:5173"]
 
+    # Redis and Cache Configuration
     redis_url: str = "redis://localhost:6379/0"
     cache_backend: Literal["redis", "memory"] = "redis"
     cache_ttl_seconds: int = 86400
 
-    github_webhook_secret: str = ""
+    # GitHub Configuration
+    github_webhook_secret: SecretStr = SecretStr("")
+    github_token: SecretStr = SecretStr("")
+    github_api_url: str = "https://api.github.com"
+    github_bot_login: str = ""
 
-        # Azure OpenAI Configuration
+    # Azure OpenAI Configuration
     azure_openai_endpoint: str = ""
     azure_openai_api_key: SecretStr = SecretStr("")
     azure_openai_api_version: str = "2025-04-01-preview"

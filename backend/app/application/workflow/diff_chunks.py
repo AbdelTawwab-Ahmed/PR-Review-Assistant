@@ -43,7 +43,8 @@ def is_reviewable(file: ChangedFile) -> bool:
 
 
 def render_file(file: ChangedFile, max_chars: int) -> RenderedFile:
-    header = f'<file path="{neutralize(file.path).replace(chr(34), "&quot;")}" status="{file.status}">\n'
+    escaped_path = neutralize(file.path).replace(chr(34), "&quot;")
+    header = f'<file path="{escaped_path}" status="{file.status}">\n'
     footer = "\n</file>"
     body = neutralize(annotate_patch(file.patch))
     room = max_chars - len(header) - len(footer)

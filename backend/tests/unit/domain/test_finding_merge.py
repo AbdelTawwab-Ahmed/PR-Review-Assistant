@@ -14,13 +14,23 @@ def fnd(
 
 
 def test_duplicates_keep_highest_severity() -> None:
-    merged = merge_findings([fnd(Severity.MEDIUM), fnd(Severity.HIGH, source="security")])
+    merged = merge_findings(
+        [
+            fnd(Severity.LOW, title="Null  Deref"),
+            fnd(Severity.HIGH, title="null deref"),
+        ]
+    )
     assert len(merged) == 1
     assert merged[0].severity is Severity.HIGH
 
 
 def test_title_matching_ignores_case_and_spacing() -> None:
-    merged = merge_findings([fnd(Severity.LOW, title="Null  Deref"), fnd(Severity.LOW, title="null deref")])
+    merged = merge_findings(
+        [
+            fnd(Severity.LOW, title="Null  Deref"),
+            fnd(Severity.LOW, title="null deref"),
+        ]
+    )
     assert len(merged) == 1
 
 

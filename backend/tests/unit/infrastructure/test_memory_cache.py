@@ -51,3 +51,18 @@ async def test_non_json_value_is_rejected() -> None:
     except TypeError:
         return
     raise AssertionError("Expected TypeError for a non-JSON value")
+
+
+async def test_set_if_absent_keeps_first_value() -> None:
+    cache = InMemoryCache()
+    assert await cache.set_if_absent("k", 1) is True
+    assert await cache.set_if_absent("k", 2) is False
+    assert await cache.get("k") == 1
+
+
+async def test_set_if_absent_works_again_after_expiry() -> None:
+    clock = FakeClock()
+    cache = InMemoryCache(clock=clock)
+    assert await cache.set_if_absent("k", 1, ttl_seconds=5) is True
+    clock.now = 5
+    assert await cache.set_if_absent("k", 2, ttl_seconds=5) is True
