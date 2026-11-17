@@ -1,3 +1,4 @@
+
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
@@ -8,16 +9,18 @@ from app.core.config import get_settings
 from app.core.container import build_container
 from app.core.errors import register_error_handlers
 from app.core.logging import configure_logging
-from app.interfaces.api.routers import health, webhooks
+from app.interfaces.api.routers import dev, health, webhooks
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     settings = get_settings()
     configure_logging(settings.log_level)
+
     container = build_container(settings)
     app.state.container = container
     app.state.cache = container.cache
+
     try:
         yield
     finally:
@@ -26,7 +29,12 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
 def create_app() -> FastAPI:
     settings = get_settings()
-    app = FastAPI(title=settings.app_name, debug=settings.debug, lifespan=lifespan)
+
+    app = FastAPI(
+        title=settings.app_name,
+        debug=settings.debug,
+        lifespan=lifespan,
+    )
 
     app.add_middleware(
         CORSMiddleware,
@@ -35,9 +43,15 @@ def create_app() -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
+
     register_error_handlers(app)
+
     app.include_router(health.router, prefix=settings.api_prefix)
     app.include_router(webhooks.router, prefix=settings.api_prefix)
+
+    if settings.environment == "development":
+        app.include_router(dev.router, prefix=settings.api_prefix)
+
     return app
 
 

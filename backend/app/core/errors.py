@@ -25,6 +25,15 @@ class UnauthorizedError(AppError):
     status_code = 401
     code = "unauthorized"
 
+class UpstreamError(AppError):
+    status_code = 502
+    code = "upstream_error"
+
+
+class ServiceUnavailableError(AppError):
+    status_code = 503
+    code = "service_unavailable"
+
 
 def register_error_handlers(app: FastAPI) -> None:
     @app.exception_handler(AppError)
