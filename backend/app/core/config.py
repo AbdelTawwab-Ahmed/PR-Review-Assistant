@@ -58,6 +58,7 @@ class Settings(BaseSettings):
     sandbox_max_files: int = 20000
     sandbox_max_analyzed_files: int = 200
 
+
 @lru_cache
 def get_settings() -> Settings:
     return Settings()

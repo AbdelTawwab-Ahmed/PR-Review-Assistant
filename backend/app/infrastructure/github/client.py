@@ -1,4 +1,3 @@
-
 import logging
 from collections.abc import Sequence
 from dataclasses import asdict
@@ -70,10 +69,7 @@ class GitHubClient:
             head_sha=head_sha,
             files=files,
             draft=bool(pr.get("draft", False)),
-            from_fork=(
-                head_repo is not None
-                and head_repo.lower() != base_repo.lower()
-            ),
+            from_fork=(head_repo is not None and head_repo.lower() != base_repo.lower()),
         )
 
     async def post_comment(
@@ -130,9 +126,7 @@ class GitHubClient:
                 repo_full_name,
                 number,
             )
-            lines = "\n".join(
-                f"- `{c.path}:{c.line}` {c.body}" for c in comments
-            )
+            lines = "\n".join(f"- `{c.path}:{c.line}` {c.body}" for c in comments)
             await self.post_comment(
                 repo_full_name,
                 number,
@@ -166,16 +160,12 @@ class GitHubClient:
                     size += len(chunk)
 
                     if size > max_bytes:
-                        raise GitHubError(
-                            "repository archive exceeds the size limit"
-                        )
+                        raise GitHubError("repository archive exceeds the size limit")
 
                     chunks.append(chunk)
 
         except httpx.HTTPError as exc:
-            raise GitHubError(
-                f"GitHub request failed: {exc}"
-            ) from exc
+            raise GitHubError(f"GitHub request failed: {exc}") from exc
 
         return b"".join(chunks)
 
@@ -190,9 +180,7 @@ class GitHubClient:
         """Create a commit on top of base_sha and point a NEW branch at it."""
         repo = f"/repos/{repo_full_name}"
 
-        base_commit = await self._get_json(
-            f"{repo}/git/commits/{base_sha}"
-        )
+        base_commit = await self._get_json(f"{repo}/git/commits/{base_sha}")
 
         tree = await self._post_json(
             f"{repo}/git/trees",
@@ -312,9 +300,7 @@ class GitHubClient:
         try:
             response = await self._http.request(method, path, **kwargs)
         except httpx.HTTPError as exc:
-            raise GitHubError(
-                f"GitHub request failed: {exc}"
-            ) from exc
+            raise GitHubError(f"GitHub request failed: {exc}") from exc
 
         if response.status_code >= 400:
             if response.headers.get("x-ratelimit-remaining") == "0":

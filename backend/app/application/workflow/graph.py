@@ -67,5 +67,4 @@ def build_analysis_graph(deps: WorkflowDeps):
     graph.add_edge("aggregate_findings", "score_risk")
     graph.add_edge("score_risk", END)
 
-
     return graph.compile()
