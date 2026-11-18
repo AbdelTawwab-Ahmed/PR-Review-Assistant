@@ -11,14 +11,21 @@ jobs:
     defaults:
       run:
         working-directory: backend
+
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
           cache: pip
+
       - run: pip install -e ".[dev]"
+
+      - run: ruff --version
       - run: ruff check .
       - run: ruff format --check .
+
       - run: bandit -r app -q
+
       - run: pytest
