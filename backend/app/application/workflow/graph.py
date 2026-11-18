@@ -7,11 +7,9 @@ from app.application.workflow.agents.security import SecurityAgent
 from app.application.workflow.deps import WorkflowDeps
 from app.application.workflow.nodes.aggregate_findings import aggregate_findings
 from app.application.workflow.nodes.analyze_chunk import make_analyze_chunk
-from app.application.workflow.nodes.apply_fixes import make_apply_fixes
 from app.application.workflow.nodes.fetch_context import make_fetch_context
 from app.application.workflow.nodes.impact_analysis import make_impact_analysis
 from app.application.workflow.nodes.plan_analysis import make_plan_analysis
-from app.application.workflow.nodes.plan_fixes import make_plan_fixes
 from app.application.workflow.nodes.score_risk import score_risk
 from app.application.workflow.nodes.static_analysis import make_static_analysis
 from app.application.workflow.state import ReviewState
@@ -37,15 +35,6 @@ def make_fan_out(static_enabled: bool):
         return sends or ["aggregate_findings"]
 
     return fan_out
-
-
-def after_risk(state: ReviewState) -> str:
-    return "plan_fixes" if state.get("fix_requested") else END
-
-
-def after_plan(state: ReviewState) -> str:
-    plan = state.get("fix_plan")
-    return "apply_fixes" if plan is not None and not plan.is_empty else END
 
 
 def build_analysis_graph(deps: WorkflowDeps):
@@ -76,13 +65,7 @@ def build_analysis_graph(deps: WorkflowDeps):
     graph.add_edge("analyze_chunk", "aggregate_findings")
     graph.add_edge("impact_analysis", "aggregate_findings")
     graph.add_edge("aggregate_findings", "score_risk")
+    graph.add_edge("score_risk", END)
 
-    if deps.fix_engine is not None:
-        graph.add_node("plan_fixes", make_plan_fixes(deps.fix_min_severity, deps.fix_max_files))
-        graph.add_node("apply_fixes", make_apply_fixes(deps.fix_engine))
-        graph.add_conditional_edges("score_risk", after_risk, ["plan_fixes", END])
-        graph.add_conditional_edges("plan_fixes", after_plan, ["apply_fixes", END])
-        graph.add_edge("apply_fixes", END)
-    else:
-        graph.add_edge("score_risk", END)
+
     return graph.compile()

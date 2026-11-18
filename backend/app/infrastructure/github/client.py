@@ -1,6 +1,5 @@
 
 import logging
-
 from collections.abc import Sequence
 from dataclasses import asdict
 from typing import Any
@@ -12,7 +11,6 @@ from app.application.ports.cache_port import CachePort
 from app.application.ports.github_port import FileUpdate, GitHubError, ReviewComment
 from app.domain.entities.pull_request import ChangedFile, PullRequest
 from app.infrastructure.github.diff_parser import parse_files
-
 
 logger = logging.getLogger(__name__)
 
