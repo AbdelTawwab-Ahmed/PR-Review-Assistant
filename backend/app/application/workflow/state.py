@@ -1,4 +1,6 @@
+
 import operator
+
 from typing import Annotated, TypedDict
 
 from app.application.workflow.diff_chunks import RenderedFile
@@ -6,6 +8,8 @@ from app.domain.entities.finding import Finding
 from app.domain.entities.impact_report import ImpactReport
 from app.domain.entities.pull_request import PullRequest
 from app.domain.entities.risk_report import RiskReport
+from app.domain.entities.fix_plan import FixPlan
+from app.domain.entities.fix_proposal import FixProposal
 
 
 class ReviewState(TypedDict, total=False):
@@ -19,6 +23,10 @@ class ReviewState(TypedDict, total=False):
     final_findings: list[Finding]
     risk: RiskReport
 
+    fix_requested: bool
+    fix_plan: FixPlan
+    proposal: FixProposal
+
 
 class ChunkTask(TypedDict):
     """Payload sent to `analyze_chunk` through the Send API."""
@@ -31,3 +39,7 @@ class ChunkTask(TypedDict):
 class ImpactTask(TypedDict):
     pr: PullRequest
     chunk: tuple[RenderedFile, ...]
+
+
+class StaticTask(TypedDict):
+    pr: PullRequest

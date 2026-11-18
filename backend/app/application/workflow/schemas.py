@@ -24,3 +24,13 @@ class ImpactOut(BaseModel):
     affected_components: list[str]
     breaking_changes: list[str]
     suggested_checks: list[str]
+
+
+class EditOut(BaseModel):
+    old_text: str
+    new_text: str
+
+
+class FileFixOut(BaseModel):
+    edits: list[EditOut]
+    explanation: str

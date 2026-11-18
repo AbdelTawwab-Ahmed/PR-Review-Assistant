@@ -114,3 +114,27 @@ async def test_non_422_review_error_is_raised() -> None:
     client = make_client(handler)
     with pytest.raises(GitHubError):
         await client.post_review("org/repo", 7, "abc123", "Summary", [])
+
+
+async def test_download_archive_returns_the_bytes() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.url.path == "/repos/org/repo/tarball/abc123"
+        return httpx.Response(200, content=b"tarball")
+
+    assert await make_client(handler).download_archive("org/repo", "abc123", 1000) == b"tarball"
+
+
+async def test_download_archive_enforces_the_size_limit() -> None:
+    client = make_client(lambda request: httpx.Response(200, content=b"x" * 100))
+
+    with pytest.raises(GitHubError):
+        await client.download_archive("org/repo", "abc123", 50)
+
+
+async def test_download_archive_reports_http_errors() -> None:
+    client = make_client(lambda request: httpx.Response(404, json={}))
+
+    with pytest.raises(GitHubError) as exc_info:
+        await client.download_archive("org/repo", "abc123", 1000)
+
+    assert exc_info.value.status_code == 404
