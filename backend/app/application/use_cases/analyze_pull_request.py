@@ -3,6 +3,7 @@ from typing import Any
 
 from app.domain.entities.finding import Finding
 from app.domain.entities.impact_report import ImpactReport
+from app.domain.entities.pull_request import PullRequest
 from app.domain.entities.risk_report import RiskReport
 
 
@@ -23,9 +24,13 @@ class AnalyzePullRequest:
 
     async def execute(self, repo_full_name: str, pr_number: int) -> AnalysisResult:
         state = await self._graph.ainvoke(
-            {"repo_full_name": repo_full_name, "pr_number": pr_number}
+            {
+                "repo_full_name": repo_full_name,
+                "pr_number": pr_number,
+            }
         )
-        pr = state["pr"]
+        pr: PullRequest = state["pr"]
+
         return AnalysisResult(
             repo_full_name=pr.repo_full_name,
             pr_number=pr.number,

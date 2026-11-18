@@ -25,6 +25,7 @@ class PullRequest:
     head_sha: str
     files: tuple[ChangedFile, ...] = ()
     draft: bool = False
+    from_fork: bool = False
 
     @property
     def total_additions(self) -> int:

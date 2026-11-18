@@ -1,4 +1,3 @@
-
 from functools import lru_cache
 from typing import Literal
 
@@ -45,6 +44,19 @@ class Settings(BaseSettings):
     # Review Configuration
     review_chunk_chars: int = 24000
     review_max_chunks: int = 8
+
+    # Sandbox Configuration
+    sandbox_enabled: bool = False
+    sandbox_image: str = "prra-sandbox:latest"
+    sandbox_memory_mb: int = 2048
+    sandbox_cpus: float = 1.0
+    sandbox_pids_limit: int = 512
+    sandbox_timeout_seconds: int = 120
+    sandbox_test_timeout_seconds: int = 300
+    sandbox_max_concurrency: int = 2
+    sandbox_workspace_max_mb: int = 200
+    sandbox_max_files: int = 20000
+    sandbox_max_analyzed_files: int = 200
 
 
 @lru_cache

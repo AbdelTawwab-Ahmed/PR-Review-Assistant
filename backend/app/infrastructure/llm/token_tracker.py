@@ -24,10 +24,10 @@ class TokenTracker:
     def snapshot(self) -> dict[str, dict]:
         by_purpose = {
             name: {
-        "calls": u.calls,
-        "input_tokens": u.input_tokens,
-        "output_tokens": u.output_tokens,
-}
+                "calls": u.calls,
+                "input_tokens": u.input_tokens,
+                "output_tokens": u.output_tokens,
+            }
             for name, u in self._by_purpose.items()
         }
         total = {

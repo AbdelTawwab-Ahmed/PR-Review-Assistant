@@ -41,3 +41,19 @@ class ApprovalDecision(StrEnum):
     APPROVE = "approve"
     REJECT = "reject"
     REQUEST_CHANGES = "request_changes"
+
+
+class FixStatus(StrEnum):
+    VERIFIED = "verified"  # checks ran and nothing got worse
+    UNVERIFIED = "unverified"  # edits exist but no sandbox tools were available
+    FAILED = "failed"  # still regressing after the last attempt, no changes proposed
+    NOTHING_TO_FIX = "nothing_to_fix"
+
+
+SEVERITY_LEVEL: dict[Severity, int] = {
+    Severity.INFO: 0,
+    Severity.LOW: 1,
+    Severity.MEDIUM: 2,
+    Severity.HIGH: 3,
+    Severity.CRITICAL: 4,
+}

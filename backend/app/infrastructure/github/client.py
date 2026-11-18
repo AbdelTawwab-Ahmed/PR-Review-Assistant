@@ -1,4 +1,5 @@
 import logging
+from collections.abc import Sequence
 from dataclasses import asdict
 from typing import Any
 
@@ -6,7 +7,7 @@ import httpx
 
 from app.application.caching import get_or_compute, pr_diff_key
 from app.application.ports.cache_port import CachePort
-from app.application.ports.github_port import GitHubError, ReviewComment
+from app.application.ports.github_port import FileUpdate, GitHubError, ReviewComment
 from app.domain.entities.pull_request import ChangedFile, PullRequest
 from app.infrastructure.github.diff_parser import parse_files
 
@@ -31,6 +32,7 @@ class GitHubClient:
         }
         if token:
             headers["Authorization"] = f"Bearer {token}"
+
         self._http = http or httpx.AsyncClient(
             base_url=api_url,
             headers=headers,
@@ -44,12 +46,21 @@ class GitHubClient:
     async def aclose(self) -> None:
         await self._http.aclose()
 
-    async def get_pull_request(self, repo_full_name: str, number: int) -> PullRequest:
+    async def get_pull_request(
+        self,
+        repo_full_name: str,
+        number: int,
+    ) -> PullRequest:
         pr = await self._get_json(f"/repos/{repo_full_name}/pulls/{number}")
+
         head_sha = pr["head"]["sha"]
+        base_repo = pr["base"]["repo"]["full_name"]
+        head_repo = (pr["head"].get("repo") or {}).get("full_name")
+
         files = await self._load_files(repo_full_name, number, head_sha)
+
         return PullRequest(
-            repo_full_name=pr["base"]["repo"]["full_name"],
+            repo_full_name=base_repo,
             number=pr["number"],
             title=pr["title"],
             author=pr["user"]["login"],
@@ -58,11 +69,19 @@ class GitHubClient:
             head_sha=head_sha,
             files=files,
             draft=bool(pr.get("draft", False)),
+            from_fork=(head_repo is not None and head_repo.lower() != base_repo.lower()),
         )
 
-    async def post_comment(self, repo_full_name: str, number: int, body: str) -> None:
+    async def post_comment(
+        self,
+        repo_full_name: str,
+        number: int,
+        body: str,
+    ) -> None:
         await self._request(
-            "POST", f"/repos/{repo_full_name}/issues/{number}/comments", json={"body": body}
+            "POST",
+            f"/repos/{repo_full_name}/issues/{number}/comments",
+            json={"body": body},
         )
 
     async def post_review(
@@ -74,60 +93,222 @@ class GitHubClient:
         comments: list[ReviewComment],
     ) -> None:
         # event=COMMENT on purpose: the bot never approves or requests changes by itself.
-        payload: dict[str, Any] = {"commit_id": commit_sha, "body": body, "event": "COMMENT"}
+        payload: dict[str, Any] = {
+            "commit_id": commit_sha,
+            "body": body,
+            "event": "COMMENT",
+        }
+
         if comments:
             payload["comments"] = [
-                {"path": c.path, "line": c.line, "side": "RIGHT", "body": c.body} for c in comments
+                {
+                    "path": c.path,
+                    "line": c.line,
+                    "side": "RIGHT",
+                    "body": c.body,
+                }
+                for c in comments
             ]
+
         try:
             await self._request(
-                "POST", f"/repos/{repo_full_name}/pulls/{number}/reviews", json=payload
+                "POST",
+                f"/repos/{repo_full_name}/pulls/{number}/reviews",
+                json=payload,
             )
         except GitHubError as exc:
             if exc.status_code != 422 or not comments:
                 raise
+
             # One bad line number rejects the whole review: fall back to a plain comment.
             logger.warning(
-                "inline review rejected for %s#%s, posting plain comment", repo_full_name, number
+                "inline review rejected for %s#%s, posting plain comment",
+                repo_full_name,
+                number,
             )
             lines = "\n".join(f"- `{c.path}:{c.line}` {c.body}" for c in comments)
-            await self.post_comment(repo_full_name, number, f"{body}\n\n{lines}")
+            await self.post_comment(
+                repo_full_name,
+                number,
+                f"{body}\n\n{lines}",
+            )
+
+    async def download_archive(
+        self,
+        repo_full_name: str,
+        ref: str,
+        max_bytes: int,
+    ) -> bytes:
+        path = f"/repos/{repo_full_name}/tarball/{ref}"
+
+        try:
+            async with self._http.stream(
+                "GET",
+                path,
+                follow_redirects=True,
+            ) as response:
+                if response.status_code >= 400:
+                    raise GitHubError(
+                        f"GET {path} returned {response.status_code}",
+                        response.status_code,
+                    )
+
+                chunks: list[bytes] = []
+                size = 0
+
+                async for chunk in response.aiter_bytes():
+                    size += len(chunk)
+
+                    if size > max_bytes:
+                        raise GitHubError("repository archive exceeds the size limit")
+
+                    chunks.append(chunk)
+
+        except httpx.HTTPError as exc:
+            raise GitHubError(f"GitHub request failed: {exc}") from exc
+
+        return b"".join(chunks)
+
+    async def commit_files_to_new_branch(
+        self,
+        repo_full_name: str,
+        base_sha: str,
+        branch: str,
+        message: str,
+        files: Sequence[FileUpdate],
+    ) -> str:
+        """Create a commit on top of base_sha and point a NEW branch at it."""
+        repo = f"/repos/{repo_full_name}"
+
+        base_commit = await self._get_json(f"{repo}/git/commits/{base_sha}")
+
+        tree = await self._post_json(
+            f"{repo}/git/trees",
+            {
+                "base_tree": base_commit["tree"]["sha"],
+                "tree": [
+                    {
+                        "path": file.path,
+                        "mode": "100644",
+                        "type": "blob",
+                        "content": file.content,
+                    }
+                    for file in files
+                ],
+            },
+        )
+
+        commit = await self._post_json(
+            f"{repo}/git/commits",
+            {
+                "message": message,
+                "tree": tree["sha"],
+                "parents": [base_sha],
+            },
+        )
+
+        # POST (not PATCH): an existing branch is never overwritten.
+        await self._post_json(
+            f"{repo}/git/refs",
+            {
+                "ref": f"refs/heads/{branch}",
+                "sha": commit["sha"],
+            },
+        )
+
+        return commit["sha"]
+
+    async def open_pull_request(
+        self,
+        repo_full_name: str,
+        head: str,
+        base: str,
+        title: str,
+        body: str,
+    ) -> str:
+        created = await self._post_json(
+            f"/repos/{repo_full_name}/pulls",
+            {
+                "title": title,
+                "head": head,
+                "base": base,
+                "body": body,
+            },
+        )
+        return created["html_url"]
+
+    async def _post_json(
+        self,
+        path: str,
+        payload: dict[str, Any],
+    ) -> Any:
+        response = await self._request("POST", path, json=payload)
+        return response.json()
 
     async def _load_files(
-        self, repo_full_name: str, number: int, head_sha: str
+        self,
+        repo_full_name: str,
+        number: int,
+        head_sha: str,
     ) -> tuple[ChangedFile, ...]:
         async def producer() -> list[dict[str, Any]]:
             raw: list[dict[str, Any]] = []
+
             for page in range(1, MAX_FILES // self._per_page + 1):
                 batch = await self._get_json(
                     f"/repos/{repo_full_name}/pulls/{number}/files",
-                    params={"per_page": self._per_page, "page": page},
+                    params={
+                        "per_page": self._per_page,
+                        "page": page,
+                    },
                 )
+
                 raw.extend(batch)
+
                 if len(batch) < self._per_page:
                     break
+
             return [asdict(f) for f in parse_files(raw)]
 
         if self._cache is None:
             cached = await producer()
         else:
             key = pr_diff_key(repo_full_name, head_sha)
-            cached = await get_or_compute(self._cache, key, producer, self._ttl)
+            cached = await get_or_compute(
+                self._cache,
+                key,
+                producer,
+                self._ttl,
+            )
+
         return tuple(ChangedFile(**item) for item in cached)
 
-    async def _get_json(self, path: str, params: dict[str, Any] | None = None) -> Any:
+    async def _get_json(
+        self,
+        path: str,
+        params: dict[str, Any] | None = None,
+    ) -> Any:
         response = await self._request("GET", path, params=params)
         return response.json()
 
-    async def _request(self, method: str, path: str, **kwargs: Any) -> httpx.Response:
+    async def _request(
+        self,
+        method: str,
+        path: str,
+        **kwargs: Any,
+    ) -> httpx.Response:
         try:
             response = await self._http.request(method, path, **kwargs)
         except httpx.HTTPError as exc:
             raise GitHubError(f"GitHub request failed: {exc}") from exc
+
         if response.status_code >= 400:
             if response.headers.get("x-ratelimit-remaining") == "0":
                 logger.warning("GitHub rate limit exhausted")
+
             raise GitHubError(
-                f"{method} {path} returned {response.status_code}", response.status_code
+                f"{method} {path} returned {response.status_code}",
+                response.status_code,
             )
+
         return response
