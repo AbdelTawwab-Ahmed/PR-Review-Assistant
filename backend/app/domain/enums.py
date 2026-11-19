@@ -1,4 +1,3 @@
-
 from enum import StrEnum
 
 
@@ -10,7 +9,7 @@ class Severity(StrEnum):
     CRITICAL = "critical"
 
 
-SEVERITY_LEVEL = {
+SEVERITY_LEVEL: dict[Severity, int] = {
     Severity.INFO: 0,
     Severity.LOW: 1,
     Severity.MEDIUM: 2,
@@ -20,10 +19,10 @@ SEVERITY_LEVEL = {
 
 
 class FixStatus(StrEnum):
-    NOTHING_TO_FIX = "nothing_to_fix"
-    FAILED = "failed"
-    UNVERIFIED = "unverified"
     VERIFIED = "verified"
+    UNVERIFIED = "unverified"
+    FAILED = "failed"
+    NOTHING_TO_FIX = "nothing_to_fix"
 
 
 class FindingCategory(StrEnum):

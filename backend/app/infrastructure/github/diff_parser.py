@@ -1,4 +1,3 @@
-
 from typing import Any
 
 from app.domain.entities.pull_request import ChangedFile

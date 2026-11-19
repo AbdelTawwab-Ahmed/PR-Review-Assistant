@@ -16,7 +16,15 @@ def unified_diff(path: str, old: str, new: str) -> str:
 
 
 def count_changed_lines(old: str, new: str) -> int:
-    lines = list(difflib.unified_diff(old.splitlines(), new.splitlines(), lineterm="", n=0))[2:]
+    lines = list(
+        difflib.unified_diff(
+            old.splitlines(),
+            new.splitlines(),
+            lineterm="",
+            n=0,
+        )
+    )[2:]
+
     return sum(1 for line in lines if line.startswith(("+", "-")))
 
 

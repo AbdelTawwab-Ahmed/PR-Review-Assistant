@@ -81,8 +81,8 @@ class FixerAgent:
             purpose=self.name,
         )
         edits = tuple(
-    TextEdit(e.old_text, e.new_text)
-    for e in out.edits[:MAX_EDITS_PER_FILE]
-    if e.old_text.strip()
-)
+            TextEdit(e.old_text, e.new_text)
+            for e in out.edits[:MAX_EDITS_PER_FILE]
+            if e.old_text.strip()
+        )
         return FileFix(edits, clip(out.explanation, 500) or "")

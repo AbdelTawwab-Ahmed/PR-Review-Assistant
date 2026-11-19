@@ -112,9 +112,7 @@ class FixEngine:
             self._suite_runner is not None and self._settings.run_tests
         )
 
-    async def run(
-        self, pr: PullRequest, plan: FixPlan, findings: list[Finding]
-    ) -> FixProposal:
+    async def run(self, pr: PullRequest, plan: FixPlan, findings: list[Finding]) -> FixProposal:
         settings = self._settings
         by_id = {f.id: f for f in findings}
         notes: list[str] = []
@@ -200,9 +198,8 @@ class FixEngine:
             FileChange(p, originals[p], current[p]) for p in paths if current[p] != originals[p]
         )
         summary = "\n".join(
-    f"- `{c.path}`: {explanations.get(c.path) or 'updated'}"
-    for c in changes
-)
+            f"- `{c.path}`: {explanations.get(c.path) or 'updated'}" for c in changes
+        )
         return FixProposal(status, pr.head_sha, changes, attempts, targeted, summary, tuple(notes))
 
     def _read_originals(self, ws: Workspace, plan: FixPlan, notes: list[str]) -> dict[str, str]:
@@ -211,8 +208,8 @@ class FixEngine:
             content = self._files.read(ws, action.file_path)
             if content is None:
                 notes.append(
-    f"{action.file_path}: could not be read (missing, binary or not UTF-8)"
-)
+                    f"{action.file_path}: could not be read (missing, binary or not UTF-8)"
+                )
             elif len(content) > self._settings.max_file_chars:
                 notes.append(f"{action.file_path}: too large to fix automatically")
             else:

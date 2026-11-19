@@ -16,6 +16,11 @@ class NotFoundError(AppError):
     code = "not_found"
 
 
+class ConflictError(AppError):
+    status_code = 409
+    code = "conflict"
+
+
 class ValidationFailedError(AppError):
     status_code = 422
     code = "validation_failed"
@@ -24,6 +29,7 @@ class ValidationFailedError(AppError):
 class UnauthorizedError(AppError):
     status_code = 401
     code = "unauthorized"
+
 
 class UpstreamError(AppError):
     status_code = 502
@@ -40,5 +46,10 @@ def register_error_handlers(app: FastAPI) -> None:
     async def handle_app_error(_: Request, exc: AppError) -> JSONResponse:
         return JSONResponse(
             status_code=exc.status_code,
-            content={"error": {"code": exc.code, "message": exc.message}},
+            content={
+                "error": {
+                    "code": exc.code,
+                    "message": exc.message,
+                }
+            },
         )

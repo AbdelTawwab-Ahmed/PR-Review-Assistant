@@ -1,3 +1,4 @@
+from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Protocol
 
@@ -17,10 +18,25 @@ class ReviewComment:
     body: str
 
 
-class GitHubPort(Protocol):
-    async def get_pull_request(self, repo_full_name: str, number: int) -> PullRequest: ...
+@dataclass(frozen=True)
+class FileUpdate:
+    path: str
+    content: str
 
-    async def post_comment(self, repo_full_name: str, number: int, body: str) -> None: ...
+
+class GitHubPort(Protocol):
+    async def get_pull_request(
+        self,
+        repo_full_name: str,
+        number: int,
+    ) -> PullRequest: ...
+
+    async def post_comment(
+        self,
+        repo_full_name: str,
+        number: int,
+        body: str,
+    ) -> None: ...
 
     async def post_review(
         self,
@@ -30,3 +46,29 @@ class GitHubPort(Protocol):
         body: str,
         comments: list[ReviewComment],
     ) -> None: ...
+
+    async def commit_files_to_new_branch(
+        self,
+        repo_full_name: str,
+        base_sha: str,
+        branch: str,
+        message: str,
+        files: Sequence[FileUpdate],
+    ) -> str: ...
+
+    async def open_pull_request(
+        self,
+        repo_full_name: str,
+        head: str,
+        base: str,
+        title: str,
+        body: str,
+    ) -> str: ...
+
+    async def download_repository_archive(
+        self,
+        repo_full_name: str,
+        sha: str,
+        *,
+        max_bytes: int,
+    ) -> bytes: ...

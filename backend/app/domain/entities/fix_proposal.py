@@ -22,6 +22,4 @@ class FixProposal:
 
     @property
     def publishable(self) -> bool:
-        return (
-            self.status in (FixStatus.VERIFIED, FixStatus.UNVERIFIED) and bool(self.changes)
-        )
+        return self.status in (FixStatus.VERIFIED, FixStatus.UNVERIFIED) and bool(self.changes)

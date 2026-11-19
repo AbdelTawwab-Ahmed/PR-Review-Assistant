@@ -13,7 +13,9 @@ SKIP_DIRS = ("node_modules/", "dist/", "build/", "vendor/", "__pycache__/", ".ve
 TRUNCATION_NOTE = "\n[... diff truncated ...]"
 
 # The PR author controls all of this text, so our own delimiter tags are defused.
-_OWN_TAGS = re.compile(r"</(file|diff|pr_meta|file_list)\s*>", re.IGNORECASE)
+_OWN_TAGS = re.compile(
+    r"</(file|diff|pr_meta|file_list|findings|validation_output)\s*>", re.IGNORECASE
+)
 
 
 def neutralize(text: str) -> str:

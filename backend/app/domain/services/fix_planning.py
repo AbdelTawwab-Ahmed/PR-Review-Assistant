@@ -1,4 +1,3 @@
-
 from collections.abc import Sequence
 
 from app.domain.entities.finding import Finding
@@ -18,10 +17,9 @@ def plan_fixes(
 ) -> FixPlan:
     """Pick serious findings in editable files changed by the PR."""
     editable = {
-        file.path
-        for file in files
-        if file.status != "removed" and is_editable_path(file.path)
+        file.path for file in files if file.status != "removed" and is_editable_path(file.path)
     }
+
     threshold = SEVERITY_LEVEL[min_severity]
     by_file: dict[str, list[Finding]] = {}
 
@@ -46,6 +44,7 @@ def plan_fixes(
     )[:max_files]
 
     actions = []
+
     for path, items in ranked:
         top = sorted(
             items,
@@ -62,5 +61,5 @@ def plan_fixes(
 
     return FixPlan(
         actions=tuple(actions),
-        rationale=f"{len(actions)} file(s) with findings of severity {min_severity} or higher",
+        rationale=(f"{len(actions)} file(s) with findings of severity {min_severity} or higher"),
     )
