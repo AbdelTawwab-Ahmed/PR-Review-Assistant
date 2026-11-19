@@ -25,6 +25,12 @@ class SuiteResult:
     duration_seconds: float = 0.0
     notes: tuple[str, ...] = ()
 
+    # Errors that make the test result unreliable.
+    validation_errors: tuple[str, ...] = ()
+
+    # True when the failure list does not contain every failure.
+    failures_truncated: bool = False
+
 
 class SuiteRunnerPort(Protocol):
     async def run(

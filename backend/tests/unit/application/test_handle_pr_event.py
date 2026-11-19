@@ -74,3 +74,11 @@ async def test_failed_dispatch_releases_the_delivery() -> None:
 
     dispatcher.fail = False
     assert await use_case.execute(make_event()) is EventOutcome.ACCEPTED
+
+
+async def test_bot_fix_branches_are_ignored() -> None:
+    dispatcher = FakeDispatcher()
+    use_case = HandlePullRequestEvent(InMemoryCache(), dispatcher)
+    outcome = await use_case.execute(make_event(head_branch="prra/fix-pr1-abc1234"))
+    assert outcome is EventOutcome.IGNORED
+    assert dispatcher.events == []

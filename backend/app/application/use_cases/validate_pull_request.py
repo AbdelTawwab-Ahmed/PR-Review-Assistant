@@ -30,6 +30,7 @@ class ValidatePullRequest:
     ) -> None:
         self._github = github
         self._workspaces = workspaces
+
         self._analyzers = analyzers
         self._suite_runner = suite_runner
         self._max_files = max_files

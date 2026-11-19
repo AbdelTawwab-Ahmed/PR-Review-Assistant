@@ -4,6 +4,7 @@ from enum import StrEnum
 from app.application.events import PullRequestEvent
 from app.application.ports.cache_port import CachePort
 from app.application.ports.run_dispatcher import RunDispatcher
+from app.domain.services.branches import is_bot_branch
 
 logger = logging.getLogger(__name__)
 
@@ -32,7 +33,11 @@ class HandlePullRequestEvent:
     async def execute(self, event: PullRequestEvent) -> EventOutcome:
         if event.action not in HANDLED_ACTIONS or event.draft:
             return EventOutcome.IGNORED
+
         if self._bot_login and event.sender.lower() == self._bot_login:
+            return EventOutcome.IGNORED
+
+        if is_bot_branch(event.head_branch):
             return EventOutcome.IGNORED
 
         key = f"webhook:delivery:{event.delivery_id}"
@@ -45,4 +50,5 @@ class HandlePullRequestEvent:
         except Exception:
             await self._cache.delete(key)  # let GitHub's redelivery be processed
             raise
+
         return EventOutcome.ACCEPTED

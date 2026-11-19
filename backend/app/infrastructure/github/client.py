@@ -2,18 +2,25 @@ import logging
 from collections.abc import Sequence
 from dataclasses import asdict
 from typing import Any
+from urllib.parse import urljoin, urlparse
 
 import httpx
 
 from app.application.caching import get_or_compute, pr_diff_key
 from app.application.ports.cache_port import CachePort
-from app.application.ports.github_port import FileUpdate, GitHubError, ReviewComment
+from app.application.ports.github_port import (
+    FileUpdate,
+    GitHubError,
+    ReviewComment,
+)
 from app.domain.entities.pull_request import ChangedFile, PullRequest
 from app.infrastructure.github.diff_parser import parse_files
 
 logger = logging.getLogger(__name__)
 
-MAX_FILES = 3000  # GitHub's cap for the PR files endpoint
+MAX_FILES = 3000
+MAX_ARCHIVE_BYTES = 100 * 1024 * 1024
+ARCHIVE_HOSTS = {"codeload.github.com"}
 
 
 class GitHubClient:
@@ -30,6 +37,7 @@ class GitHubClient:
             "Accept": "application/vnd.github+json",
             "X-GitHub-Api-Version": "2022-11-28",
         }
+
         if token:
             headers["Authorization"] = f"Bearer {token}"
 
@@ -39,6 +47,7 @@ class GitHubClient:
             timeout=httpx.Timeout(15.0),
             transport=httpx.AsyncHTTPTransport(retries=2),
         )
+
         self._cache = cache
         self._ttl = cache_ttl_seconds
         self._per_page = per_page
@@ -72,6 +81,100 @@ class GitHubClient:
             from_fork=(head_repo is not None and head_repo.lower() != base_repo.lower()),
         )
 
+    async def download_archive(
+        self,
+        repo_full_name: str,
+        ref: str,
+        max_bytes: int = MAX_ARCHIVE_BYTES,
+    ) -> bytes:
+        """Download a repository tarball at a specific commit or ref."""
+        if max_bytes < 1:
+            raise ValueError("max_bytes must be positive")
+
+        path = f"/repos/{repo_full_name}/tarball/{ref}"
+
+        request = self._http.build_request("GET", path)
+        response = await self._send_streaming_request(request)
+
+        try:
+            if response.status_code not in (200, 302, 301):
+                self._raise_response_error(response, "GET", path)
+
+            if response.status_code in (301, 302):
+                location = response.headers.get("location")
+                if not location:
+                    raise GitHubError("GitHub archive redirect has no location")
+
+                redirect_url = urljoin(str(response.url), location)
+                parsed = urlparse(redirect_url)
+
+                if (
+                    parsed.scheme != "https"
+                    or parsed.hostname not in ARCHIVE_HOSTS
+                    or parsed.username
+                    or parsed.password
+                ):
+                    raise GitHubError("GitHub returned an unsafe archive redirect")
+
+                await response.aclose()
+
+                # Build a fresh request without the GitHub Authorization header.
+                redirect_request = httpx.Request("GET", redirect_url)
+                response = await self._send_streaming_request(redirect_request)
+
+                if response.status_code != 200:
+                    self._raise_response_error(
+                        response,
+                        "GET",
+                        "repository archive redirect",
+                    )
+
+            content_length = response.headers.get("content-length")
+            if content_length:
+                try:
+                    if int(content_length) > max_bytes:
+                        raise GitHubError("repository archive exceeds the size limit")
+                except ValueError:
+                    pass
+
+            archive = bytearray()
+
+            async for chunk in response.aiter_bytes():
+                archive.extend(chunk)
+                if len(archive) > max_bytes:
+                    raise GitHubError("repository archive exceeds the size limit")
+
+            if not archive:
+                raise GitHubError("GitHub returned an empty repository archive")
+
+            return bytes(archive)
+
+        finally:
+            await response.aclose()
+
+    async def _send_streaming_request(
+        self,
+        request: httpx.Request,
+    ) -> httpx.Response:
+        try:
+            return await self._http.send(request, stream=True)
+        except httpx.HTTPError as exc:
+            raise GitHubError(f"GitHub archive download failed: {exc}") from exc
+
+    @staticmethod
+    def _raise_response_error(
+        response: httpx.Response,
+        method: str,
+        path: str,
+    ) -> None:
+        if response.headers.get("x-ratelimit-remaining") == "0":
+            logger.warning("GitHub rate limit exhausted")
+
+        raise GitHubError(
+            f"{method} {path} returned {response.status_code}",
+            response.status_code,
+        )
+
     async def post_comment(
         self,
         repo_full_name: str,
@@ -92,7 +195,7 @@ class GitHubClient:
         body: str,
         comments: list[ReviewComment],
     ) -> None:
-        # event=COMMENT on purpose: the bot never approves or requests changes by itself.
+        # The bot only comments; it never approves or requests changes by itself.
         payload: dict[str, Any] = {
             "commit_id": commit_sha,
             "body": body,
@@ -126,48 +229,14 @@ class GitHubClient:
                 repo_full_name,
                 number,
             )
+
             lines = "\n".join(f"- `{c.path}:{c.line}` {c.body}" for c in comments)
+
             await self.post_comment(
                 repo_full_name,
                 number,
                 f"{body}\n\n{lines}",
             )
-
-    async def download_archive(
-        self,
-        repo_full_name: str,
-        ref: str,
-        max_bytes: int,
-    ) -> bytes:
-        path = f"/repos/{repo_full_name}/tarball/{ref}"
-
-        try:
-            async with self._http.stream(
-                "GET",
-                path,
-                follow_redirects=True,
-            ) as response:
-                if response.status_code >= 400:
-                    raise GitHubError(
-                        f"GET {path} returned {response.status_code}",
-                        response.status_code,
-                    )
-
-                chunks: list[bytes] = []
-                size = 0
-
-                async for chunk in response.aiter_bytes():
-                    size += len(chunk)
-
-                    if size > max_bytes:
-                        raise GitHubError("repository archive exceeds the size limit")
-
-                    chunks.append(chunk)
-
-        except httpx.HTTPError as exc:
-            raise GitHubError(f"GitHub request failed: {exc}") from exc
-
-        return b"".join(chunks)
 
     async def commit_files_to_new_branch(
         self,
@@ -207,7 +276,7 @@ class GitHubClient:
             },
         )
 
-        # POST (not PATCH): an existing branch is never overwritten.
+        # POST fails if the branch already exists, so nothing is overwritten.
         await self._post_json(
             f"{repo}/git/refs",
             {
@@ -235,6 +304,7 @@ class GitHubClient:
                 "body": body,
             },
         )
+
         return created["html_url"]
 
     async def _post_json(
@@ -242,8 +312,7 @@ class GitHubClient:
         path: str,
         payload: dict[str, Any],
     ) -> Any:
-        response = await self._request("POST", path, json=payload)
-        return response.json()
+        return (await self._request("POST", path, json=payload)).json()
 
     async def _load_files(
         self,
@@ -268,7 +337,7 @@ class GitHubClient:
                 if len(batch) < self._per_page:
                     break
 
-            return [asdict(f) for f in parse_files(raw)]
+            return [asdict(file) for file in parse_files(raw)]
 
         if self._cache is None:
             cached = await producer()
@@ -298,17 +367,15 @@ class GitHubClient:
         **kwargs: Any,
     ) -> httpx.Response:
         try:
-            response = await self._http.request(method, path, **kwargs)
+            response = await self._http.request(
+                method,
+                path,
+                **kwargs,
+            )
         except httpx.HTTPError as exc:
             raise GitHubError(f"GitHub request failed: {exc}") from exc
 
         if response.status_code >= 400:
-            if response.headers.get("x-ratelimit-remaining") == "0":
-                logger.warning("GitHub rate limit exhausted")
-
-            raise GitHubError(
-                f"{method} {path} returned {response.status_code}",
-                response.status_code,
-            )
+            self._raise_response_error(response, method, path)
 
         return response

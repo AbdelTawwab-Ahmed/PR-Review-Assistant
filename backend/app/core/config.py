@@ -4,6 +4,8 @@ from typing import Literal
 from pydantic import SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from app.domain.enums import Severity
+
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
@@ -44,6 +46,14 @@ class Settings(BaseSettings):
     # Review Configuration
     review_chunk_chars: int = 24000
     review_max_chunks: int = 8
+
+    # AI Fixing Configuration
+    fix_min_severity: Severity = Severity.MEDIUM
+    fix_max_files: int = 5
+    fix_max_attempts: int = 3
+    fix_max_changed_lines: int = 300
+    fix_max_file_chars: int = 60000
+    fix_run_tests: bool = True
 
     # Sandbox Configuration
     sandbox_enabled: bool = False
