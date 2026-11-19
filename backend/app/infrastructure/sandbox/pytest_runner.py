@@ -73,6 +73,7 @@ class PytestRunner:
 
         notes: list[str] = []
         validation_errors: list[str] = []
+        installation_failed = False
 
         if install_dependencies:
             specs = collect_requirement_specs(workspace.source / project)
@@ -97,6 +98,7 @@ class PytestRunner:
                 )
 
                 if not install.ok:
+                    installation_failed = True
                     message = (
                         f"dependency installation failed "
                         f"({describe_failure(install)}); "
@@ -128,6 +130,9 @@ class PytestRunner:
 
         counts, failures = parse_pytest_output(result.stdout)
         status = _status(result)
+
+        if installation_failed:
+            status = SuiteStatus.ERROR
 
         if status in (SuiteStatus.PASSED, SuiteStatus.FAILED):
             if not _has_summary(result.stdout):
