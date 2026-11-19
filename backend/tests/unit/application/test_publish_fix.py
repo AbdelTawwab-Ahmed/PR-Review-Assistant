@@ -29,7 +29,7 @@ async def test_publishes_a_new_branch_and_a_stacked_pull_request() -> None:
     assert commit["base_sha"] == "abc123"
     assert commit["files"] == [FileUpdate("src/a.py", "new\n")]
     pull = github.pulls[0]
-    assert (pull["head"], pull["base"]) == ("prra/fix-pr1-abc123", "feat")  # never main
+    assert (pull["head"], pull["base"]) == ("prra/fix-pr1-abc123", "feat")
 
 
 async def test_mentions_in_model_text_are_defused() -> None:
@@ -43,6 +43,7 @@ async def test_mentions_in_model_text_are_defused() -> None:
 @pytest.mark.parametrize(
     "kwargs",
     [
+        {"status": FixStatus.UNVERIFIED},
         {"status": FixStatus.FAILED},
         {"status": FixStatus.NOTHING_TO_FIX},
         {"changes": ()},
@@ -50,9 +51,12 @@ async def test_mentions_in_model_text_are_defused() -> None:
 )
 async def test_unpublishable_proposals_are_refused(kwargs: dict) -> None:
     github = FakeGitHub(make_pr())
+
     with pytest.raises(FixPublishError):
         await PublishFix(github).execute("org/repo", 1, proposal(**kwargs))
+
     assert github.commits == []
+    assert github.pulls == []
 
 
 async def test_fork_pull_requests_are_refused() -> None:
@@ -62,12 +66,15 @@ async def test_fork_pull_requests_are_refused() -> None:
 
 async def test_stale_proposals_are_refused() -> None:
     github = FakeGitHub(make_pr())
+
     with pytest.raises(FixPublishError, match="changed"):
         await PublishFix(github).execute("org/repo", 1, proposal(base_sha="older"))
+
     assert github.commits == []
 
 
 async def test_existing_fix_branch_gives_a_clear_error() -> None:
     github = FakeGitHub(make_pr(), commit_error=GitHubError("exists", 422))
+
     with pytest.raises(FixPublishError, match="already exists"):
         await PublishFix(github).execute("org/repo", 1, proposal())

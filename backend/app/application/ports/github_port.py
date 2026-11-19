@@ -6,7 +6,11 @@ from app.domain.entities.pull_request import PullRequest
 
 
 class GitHubError(Exception):
-    def __init__(self, message: str, status_code: int | None = None) -> None:
+    def __init__(
+        self,
+        message: str,
+        status_code: int | None = None,
+    ) -> None:
         super().__init__(message)
         self.status_code = status_code
 
@@ -47,6 +51,13 @@ class GitHubPort(Protocol):
         comments: list[ReviewComment],
     ) -> None: ...
 
+    async def download_archive(
+        self,
+        repo_full_name: str,
+        ref: str,
+        max_bytes: int,
+    ) -> bytes: ...
+
     async def commit_files_to_new_branch(
         self,
         repo_full_name: str,
@@ -64,11 +75,3 @@ class GitHubPort(Protocol):
         title: str,
         body: str,
     ) -> str: ...
-
-    async def download_repository_archive(
-        self,
-        repo_full_name: str,
-        sha: str,
-        *,
-        max_bytes: int,
-    ) -> bytes: ...

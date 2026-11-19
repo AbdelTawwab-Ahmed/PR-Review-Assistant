@@ -81,18 +81,17 @@ class GitHubClient:
             from_fork=(head_repo is not None and head_repo.lower() != base_repo.lower()),
         )
 
-    async def download_repository_archive(
+    async def download_archive(
         self,
         repo_full_name: str,
-        sha: str,
-        *,
+        ref: str,
         max_bytes: int = MAX_ARCHIVE_BYTES,
     ) -> bytes:
-        """Download a repository tarball at a specific commit SHA."""
+        """Download a repository tarball at a specific commit or ref."""
         if max_bytes < 1:
             raise ValueError("max_bytes must be positive")
 
-        path = f"/repos/{repo_full_name}/tarball/{sha}"
+        path = f"/repos/{repo_full_name}/tarball/{ref}"
 
         request = self._http.build_request("GET", path)
         response = await self._send_streaming_request(request)
@@ -224,6 +223,7 @@ class GitHubClient:
             if exc.status_code != 422 or not comments:
                 raise
 
+            # One bad line number rejects the whole review: fall back to a plain comment.
             logger.warning(
                 "inline review rejected for %s#%s, posting plain comment",
                 repo_full_name,
@@ -343,7 +343,6 @@ class GitHubClient:
             cached = await producer()
         else:
             key = pr_diff_key(repo_full_name, head_sha)
-
             cached = await get_or_compute(
                 self._cache,
                 key,

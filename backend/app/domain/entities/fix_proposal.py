@@ -13,7 +13,7 @@ class FileChange:
 @dataclass(frozen=True)
 class FixProposal:
     status: FixStatus
-    base_sha: str = ""  # the PR head the fixes were generated against
+    base_sha: str = ""
     changes: tuple[FileChange, ...] = ()
     attempts: int = 0
     targeted_finding_ids: tuple[str, ...] = ()
@@ -22,4 +22,5 @@ class FixProposal:
 
     @property
     def publishable(self) -> bool:
-        return self.status in (FixStatus.VERIFIED, FixStatus.UNVERIFIED) and bool(self.changes)
+        """Only verified proposals with actual changes may be published."""
+        return self.status is FixStatus.VERIFIED and bool(self.changes)

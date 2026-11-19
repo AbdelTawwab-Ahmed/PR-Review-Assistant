@@ -9,7 +9,7 @@ class SuiteStatus(StrEnum):
     PASSED = "passed"
     FAILED = "failed"
     NO_TESTS = "no_tests"
-    ERROR = "error"
+    ERROR = "error"  # collection errors, internal errors, bad usage
     TIMED_OUT = "timed_out"
 
 

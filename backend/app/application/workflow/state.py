@@ -35,9 +35,7 @@ class ChunkTask(TypedDict):
 
 class ImpactTask(TypedDict):
     pr: PullRequest
-
-
-chunk: tuple[RenderedFile, ...]
+    chunk: tuple[RenderedFile, ...]
 
 
 class StaticTask(TypedDict):

@@ -1,15 +1,17 @@
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any
 
 from pydantic import BaseModel
 
+from app.application.ports.analyzer_port import AnalyzerResult
 from app.application.ports.github_port import FileUpdate, GitHubError
 from app.application.ports.llm_port import LLMError, ModelTier
-from app.application.ports.sandbox_port import Workspace
+from app.application.ports.sandbox_port import ExecResult, Workspace
 from app.application.ports.validation_port import SuiteResult
 from app.application.workflow.schemas import FindingOut, FindingsOut, ImpactOut
+from app.domain.entities.finding import Finding
 from app.domain.entities.pull_request import ChangedFile, PullRequest
 from app.domain.enums import FindingCategory, Severity
 
@@ -200,3 +202,57 @@ class FakeSuiteRunner:
             raise RuntimeError("FakeSuiteRunner has no results configured")
 
         return self.results.pop(0) if len(self.results) > 1 else self.results[0]
+
+
+class FakeSandbox:
+    """Returns queued results in order (then a default) and records every call."""
+
+    def __init__(
+        self,
+        results: Sequence[ExecResult] | None = None,
+        default: ExecResult | None = None,
+    ) -> None:
+        self.results = list(results or [])
+        self.default = default or ExecResult(0, "", "")
+        self.calls: list[dict[str, Any]] = []
+
+    async def run(
+        self,
+        workspace: Workspace,
+        command: Sequence[str],
+        *,
+        workdir: str = ".",
+        env: Mapping[str, str] | None = None,
+        timeout_seconds: int | None = None,
+        install_mode: bool = False,
+    ) -> ExecResult:
+        self.calls.append(
+            {
+                "command": list(command),
+                "workdir": workdir,
+                "env": dict(env or {}),
+                "install_mode": install_mode,
+            }
+        )
+        return self.results.pop(0) if self.results else self.default
+
+
+class FakeAnalyzer:
+    def __init__(
+        self,
+        name: str,
+        findings: Sequence[Finding] = (),
+        error: str | None = None,
+    ) -> None:
+        self.name = name
+        self.findings = tuple(findings)
+        self.error = error
+        self.calls: list[list[str]] = []
+
+    async def run(
+        self,
+        workspace: Workspace,
+        paths: Sequence[str],
+    ) -> AnalyzerResult:
+        self.calls.append(list(paths))
+        return AnalyzerResult(self.name, self.findings, self.error)

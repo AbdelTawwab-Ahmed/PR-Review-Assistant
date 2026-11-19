@@ -1,117 +1,145 @@
 import json
+import re
 from collections.abc import Sequence
 
 from app.application.ports.analyzer_port import AnalyzerPort, AnalyzerResult
 from app.application.ports.sandbox_port import SandboxPort, Workspace
 from app.domain.entities.finding import Finding
 from app.domain.enums import FindingCategory, Severity
+from app.infrastructure.analyzers.common import (
+    container_paths,
+    describe_failure,
+    repo_path,
+)
+
+_SECURITY = re.compile(r"^S\d+$")
+_BUGLIKE = re.compile(r"^[BF]\d+$")
+
+HIGH_PREFIXES = ("E9", "F63", "F7", "F82")
+NOISY_CODES = frozenset({"F401", "F841"})
+
+
+def _severity(code: str) -> Severity:
+    if code == "syntax-error" or code.startswith(HIGH_PREFIXES):
+        return Severity.HIGH
+
+    if code in NOISY_CODES:
+        return Severity.LOW
+
+    if _SECURITY.match(code) or _BUGLIKE.match(code):
+        return Severity.MEDIUM
+
+    return Severity.LOW
+
+
+def _category(code: str) -> FindingCategory:
+    if _SECURITY.match(code):
+        return FindingCategory.SECURITY
+
+    if code == "syntax-error" or _BUGLIKE.match(code):
+        return FindingCategory.BUG
+
+    return FindingCategory.STYLE
+
+
+def parse_ruff(stdout: str) -> list[Finding]:
+    payload = json.loads(stdout.strip() or "[]")
+
+    if not isinstance(payload, list):
+        raise ValueError("Unexpected Ruff JSON output format")
+
+    findings: list[Finding] = []
+
+    for item in payload:
+        if not isinstance(item, dict):
+            raise ValueError("Unexpected Ruff finding format")
+
+        code = str(item.get("code") or "syntax-error")
+        message = str(item.get("message") or "Lint issue detected")
+
+        location = item.get("location") or {}
+        end_location = item.get("end_location") or {}
+
+        row = location.get("row")
+        end = end_location.get("row")
+
+        description = message
+        if item.get("url"):
+            description += f"\nDocs: {item['url']}"
+
+        filename = repo_path(str(item.get("filename") or ""))
+        fix = item.get("fix") or {}
+
+        findings.append(
+            Finding(
+                category=_category(code),
+                severity=_severity(code),
+                title=f"{code}: {message}"[:120],
+                description=description,
+                source="ruff",
+                file_path=filename or None,
+                line_start=row if isinstance(row, int) else None,
+                line_end=(
+                    end if isinstance(end, int) and isinstance(row, int) and end >= row else None
+                ),
+                suggestion=fix.get("message"),
+            )
+        )
+
+    return findings
 
 
 class RuffAnalyzer(AnalyzerPort):
     name = "ruff"
 
-    def __init__(self, sandbox: SandboxPort) -> None:
+    def __init__(
+        self,
+        sandbox: SandboxPort,
+        timeout_seconds: int = 60,
+    ) -> None:
         self._sandbox = sandbox
-
-    @staticmethod
-    def _category(code: str) -> FindingCategory:
-        prefix = code.upper()
-
-        if prefix.startswith("S"):
-            return FindingCategory.SECURITY
-
-        if prefix.startswith(("F", "B")):
-            return FindingCategory.BUG
-
-        if prefix.startswith(("C", "PL")):
-            return FindingCategory.CODE_SMELL
-
-        return FindingCategory.STYLE
-
-    @staticmethod
-    def _severity(code: str) -> Severity:
-        code = code.upper()
-
-        if code.startswith(("F", "S", "B")):
-            return Severity.HIGH
-
-        if code.startswith(("E", "C", "PL")):
-            return Severity.MEDIUM
-
-        return Severity.LOW
+        self._timeout = timeout_seconds
 
     async def run(self, workspace: Workspace, paths: Sequence[str]) -> AnalyzerResult:
-        if not paths:
+        targets = container_paths(paths, (".py",))
+
+        if not targets:
             return AnalyzerResult(tool=self.name)
+
+        command = [
+            "ruff",
+            "check",
+            "--output-format",
+            "json",
+            "--no-cache",
+            "--exit-zero",
+            *targets,
+        ]
 
         try:
             result = await self._sandbox.run(
                 workspace,
-                ["ruff", "check", "--output-format=json", "--", *paths],
-                timeout_seconds=60,
+                command,
+                timeout_seconds=self._timeout,
             )
         except Exception as exc:
             return AnalyzerResult(tool=self.name, error=str(exc))
 
+        if not result.ok:
+            return AnalyzerResult(
+                tool=self.name,
+                error=describe_failure(result),
+            )
+
         try:
-            payload = json.loads(result.stdout or "[]")
-        except json.JSONDecodeError as exc:
+            findings = parse_ruff(result.stdout)
+        except (ValueError, KeyError, TypeError):
             return AnalyzerResult(
                 tool=self.name,
-                error=f"Could not parse Ruff JSON output: {exc}",
+                error="could not parse ruff output",
             )
-
-        findings: list[Finding] = []
-
-        if not isinstance(payload, list):
-            return AnalyzerResult(
-                tool=self.name,
-                error="Unexpected Ruff JSON output format",
-            )
-
-        for item in payload:
-            code = str(item.get("code") or "RUFF")
-            message = str(item.get("message") or "Lint issue detected")
-
-            filename = str(item.get("filename") or "")
-            filename = filename.replace("\\", "/")
-
-            if filename.startswith("/workspace/"):
-                filename = filename[len("/workspace/") :]
-
-            location = item.get("location") or {}
-            end_location = item.get("end_location") or {}
-
-            line_start = location.get("row")
-            line_end = end_location.get("row", line_start)
-
-            fix = item.get("fix") or {}
-            suggestion = fix.get("message")
-
-            findings.append(
-                Finding(
-                    category=self._category(code),
-                    severity=self._severity(code),
-                    title=f"{code}: {message}",
-                    description=message,
-                    source=self.name,
-                    file_path=filename or None,
-                    line_start=(line_start if isinstance(line_start, int) else None),
-                    line_end=(line_end if isinstance(line_end, int) else None),
-                    suggestion=suggestion,
-                )
-            )
-
-        error = None
-        if result.timed_out:
-            error = "Ruff execution timed out"
-        elif result.truncated:
-            error = "Ruff output was truncated"
-        elif result.exit_code not in (0, 1) and not findings:
-            error = result.stderr.strip() or (f"Ruff exited with code {result.exit_code}")
 
         return AnalyzerResult(
             tool=self.name,
             findings=tuple(findings),
-            error=error,
         )

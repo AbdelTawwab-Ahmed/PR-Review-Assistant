@@ -97,15 +97,13 @@ class PytestRunner:
                 )
 
                 if not install.ok:
-                    message = f"Dependency installation failed ({describe_failure(install)})."
-
-                    return SuiteResult(
-                        status=SuiteStatus.ERROR,
-                        output_tail=(install.stdout + install.stderr)[-4000:],
-                        duration_seconds=install.duration_seconds,
-                        notes=(message,),
-                        validation_errors=(message,),
+                    message = (
+                        f"dependency installation failed "
+                        f"({describe_failure(install)}); "
+                        "tests may fail on imports"
                     )
+                    notes.append(message)
+                    validation_errors.append(message)
 
             else:
                 notes.append("No installable dependency list found.")
