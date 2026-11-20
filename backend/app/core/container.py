@@ -78,23 +78,13 @@ def _build_sandbox(settings: Settings) -> SandboxPort:
     if settings.sandbox_backend == "dynamic_sessions":
         endpoint = settings.dynamic_sessions_pool_endpoint
         if endpoint:
-            logger.info(
-                "using Azure Dynamic Sessions sandbox"
-            )
+            logger.info("using Azure Dynamic Sessions sandbox")
             return DynamicSessionsSandbox(
                 DynamicSessionsConfig(
                     pool_endpoint=endpoint,
-                    api_key=(
-                        settings.dynamic_sessions_api_key
-                        .get_secret_value()
-                    ),
-                    max_session_seconds=(
-                        settings
-                        .dynamic_sessions_max_session_seconds
-                    ),
-                    max_concurrency=(
-                        settings.sandbox_max_concurrency
-                    ),
+                    api_key=(settings.dynamic_sessions_api_key.get_secret_value()),
+                    max_session_seconds=(settings.dynamic_sessions_max_session_seconds),
+                    max_concurrency=(settings.sandbox_max_concurrency),
                 ),
             )
         logger.warning(

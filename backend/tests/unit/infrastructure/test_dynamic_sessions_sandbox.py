@@ -15,7 +15,6 @@ from app.infrastructure.sandbox.dynamic_sessions_sandbox import (
     _tar_directory,
 )
 
-
 # -- fixtures --------------------------------------------------------------
 
 
@@ -76,9 +75,7 @@ def test_tar_directory_creates_valid_archive(
     data = _tar_directory(src)
     assert len(data) > 0
 
-    with tarfile.open(
-        fileobj=io.BytesIO(data), mode="r:gz"
-    ) as tar:
+    with tarfile.open(fileobj=io.BytesIO(data), mode="r:gz") as tar:
         names = sorted(tar.getnames())
         assert "./a.txt" in names or "a.txt" in names
         found_b = any("b.txt" in n for n in names)
@@ -111,9 +108,7 @@ def test_url_includes_session_id_and_api_version(
     url = sandbox._url("/code/execute", "abc123")
     assert "identifier=abc123" in url
     assert "api-version=" in url
-    assert url.startswith(
-        "https://pool.example.com/code/execute"
-    )
+    assert url.startswith("https://pool.example.com/code/execute")
 
 
 # -- run() with mocked HTTP -----------------------------------------------
@@ -151,9 +146,7 @@ async def test_run_success(
     responses = [
         _mock_response(stdout="uploaded"),  # source upload
         _mock_response(stdout="uploaded"),  # deps upload
-        _mock_response(
-            stdout="hello\n", exit_code=0
-        ),  # execution
+        _mock_response(stdout="hello\n", exit_code=0),  # execution
     ]
     call_count = 0
 
@@ -165,9 +158,7 @@ async def test_run_success(
 
     sandbox._client.post = mock_post  # type: ignore[assignment]
 
-    result = await sandbox.run(
-        workspace, ["python", "hello.py"]
-    )
+    result = await sandbox.run(workspace, ["python", "hello.py"])
 
     assert result.exit_code == 0
     assert result.stdout == "hello\n"
@@ -185,9 +176,7 @@ async def test_run_nonzero_exit(
     responses = [
         _mock_response(stdout="uploaded"),
         _mock_response(stdout="uploaded"),
-        _mock_response(
-            stderr="error!", exit_code=1
-        ),
+        _mock_response(stderr="error!", exit_code=1),
     ]
     call_count = 0
 
@@ -199,9 +188,7 @@ async def test_run_nonzero_exit(
 
     sandbox._client.post = mock_post  # type: ignore[assignment]
 
-    result = await sandbox.run(
-        workspace, ["python", "-c", "raise ValueError"]
-    )
+    result = await sandbox.run(workspace, ["python", "-c", "raise ValueError"])
 
     assert result.exit_code == 1
     assert "error!" in result.stderr
@@ -259,9 +246,7 @@ async def test_run_connection_error(
 
     sandbox._client.post = mock_post  # type: ignore[assignment]
 
-    with pytest.raises(
-        SandboxError, match="connection error"
-    ):
+    with pytest.raises(SandboxError, match="connection error"):
         await sandbox.run(workspace, ["echo", "hi"])
 
 
@@ -287,9 +272,7 @@ async def test_run_truncates_long_output(
 
     sandbox._client.post = mock_post  # type: ignore[assignment]
 
-    result = await sandbox.run(
-        workspace, ["python", "-c", "print('x'*6_000_000)"]
-    )
+    result = await sandbox.run(workspace, ["python", "-c", "print('x'*6_000_000)"])
 
     assert result.truncated is True
     assert len(result.stdout) == 5_000_000

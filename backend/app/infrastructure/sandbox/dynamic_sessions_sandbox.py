@@ -104,9 +104,7 @@ class DynamicSessionsSandbox:
         config: DynamicSessionsConfig,
     ) -> None:
         if not config.is_configured:
-            raise SandboxError(
-                "Dynamic Sessions pool endpoint is not configured"
-            )
+            raise SandboxError("Dynamic Sessions pool endpoint is not configured")
         self._config = config
         self._semaphore = asyncio.Semaphore(config.max_concurrency)
         self._client = httpx.AsyncClient(
@@ -116,11 +114,7 @@ class DynamicSessionsSandbox:
             ),
             headers={
                 "Content-Type": "application/json",
-                **(
-                    {"Authorization": f"Bearer {config.api_key}"}
-                    if config.api_key
-                    else {}
-                ),
+                **({"Authorization": f"Bearer {config.api_key}"} if config.api_key else {}),
                 **config.extra_headers,
             },
         )
@@ -143,9 +137,7 @@ class DynamicSessionsSandbox:
         async with self._semaphore:
             started = time.monotonic()
             try:
-                await self._upload_workspace(
-                    session_id, workspace
-                )
+                await self._upload_workspace(session_id, workspace)
                 result = await self._execute(
                     session_id,
                     list(command),
@@ -159,19 +151,14 @@ class DynamicSessionsSandbox:
                     stdout="",
                     stderr="session timed out",
                     timed_out=True,
-                    duration_seconds=round(
-                        time.monotonic() - started, 2
-                    ),
+                    duration_seconds=round(time.monotonic() - started, 2),
                 )
             except httpx.HTTPStatusError as exc:
                 raise SandboxError(
-                    f"Dynamic Sessions API error: "
-                    f"{exc.response.status_code}"
+                    f"Dynamic Sessions API error: {exc.response.status_code}"
                 ) from exc
             except httpx.HTTPError as exc:
-                raise SandboxError(
-                    f"Dynamic Sessions connection error: {exc}"
-                ) from exc
+                raise SandboxError(f"Dynamic Sessions connection error: {exc}") from exc
 
             duration = round(time.monotonic() - started, 2)
 
@@ -181,8 +168,7 @@ class DynamicSessionsSandbox:
             stderr=result["stderr"][:OUTPUT_LIMIT],
             timed_out=False,
             truncated=(
-                len(result["stdout"]) > OUTPUT_LIMIT
-                or len(result["stderr"]) > OUTPUT_LIMIT
+                len(result["stdout"]) > OUTPUT_LIMIT or len(result["stderr"]) > OUTPUT_LIMIT
             ),
             duration_seconds=duration,
         )
@@ -194,11 +180,7 @@ class DynamicSessionsSandbox:
 
     def _url(self, path: str, session_id: str) -> str:
         base = self._config.pool_endpoint.rstrip("/")
-        return (
-            f"{base}{path}"
-            f"?identifier={session_id}"
-            f"&api-version=2024-10-02-preview"
-        )
+        return f"{base}{path}?identifier={session_id}&api-version=2024-10-02-preview"
 
     async def _upload_workspace(
         self,
@@ -212,9 +194,7 @@ class DynamicSessionsSandbox:
         ]:
             if not directory.exists():
                 continue
-            tar_bytes = await asyncio.to_thread(
-                _tar_directory, directory
-            )
+            tar_bytes = await asyncio.to_thread(_tar_directory, directory)
             b64 = base64.b64encode(tar_bytes).decode()
             code = _UPLOAD_TEMPLATE.format(b64=b64, dest=dest)
             resp = await self._client.post(
@@ -275,11 +255,7 @@ class DynamicSessionsSandbox:
         # The API may not always surface exitCode directly;
         # treat execution errors as non-zero.
         if exit_code is None:
-            exit_code = (
-                0
-                if props.get("status") == "Succeeded"
-                else 1
-            )
+            exit_code = 0 if props.get("status") == "Succeeded" else 1
 
         return {
             "exit_code": int(exit_code),
