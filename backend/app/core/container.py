@@ -4,6 +4,7 @@ from typing import Any
 from app.application.fix_engine import FixEngine, FixSettings
 from app.application.ports.analyzer_port import AnalyzerPort
 from app.application.ports.cache_port import CachePort
+from app.application.ports.repositories import ReviewRunRepository
 from app.application.use_cases.analyze_pull_request import AnalyzePullRequest
 from app.application.use_cases.approve_run import ApproveRun
 from app.application.use_cases.get_run_status import GetRunStatus
@@ -24,6 +25,8 @@ from app.infrastructure.llm.azure_openai import AzureOpenAILLM
 from app.infrastructure.llm.model_router import ModelRouter
 from app.infrastructure.llm.token_tracker import TokenTracker
 from app.infrastructure.persistence.checkpointer import CheckpointerManager, build_checkpointer
+from app.infrastructure.persistence.database import DatabaseManager, build_database_manager
+from app.infrastructure.persistence.repositories import build_review_run_repository
 from app.infrastructure.sandbox.docker_sandbox import DockerSandbox, SandboxLimits
 from app.infrastructure.sandbox.pytest_runner import PytestRunner
 from app.infrastructure.sandbox.workspace import WorkspaceFactory
@@ -40,6 +43,8 @@ class Container:
     checkpointer_manager: CheckpointerManager
     approve_run: ApproveRun
     get_run_status: GetRunStatus
+    run_repository: ReviewRunRepository
+    db_manager: DatabaseManager | None = None
     graph: Any = None
     validation: ValidatePullRequest | None = None
     publisher: PublishFix | None = None
@@ -48,6 +53,8 @@ class Container:
         await self.github.aclose()
         await self.cache.close()
         await self.checkpointer_manager.aclose()
+        if self.db_manager is not None:
+            await self.db_manager.aclose()
 
 
 def build_container(settings: Settings) -> Container:
@@ -125,6 +132,8 @@ def build_container(settings: Settings) -> Container:
     )
 
     checkpointer_manager = build_checkpointer(settings)
+    db_manager = build_database_manager(settings)
+    run_repository = build_review_run_repository(settings, db_manager)
 
     graph = build_analysis_graph(
         WorkflowDeps(
@@ -151,6 +160,8 @@ def build_container(settings: Settings) -> Container:
         checkpointer_manager=checkpointer_manager,
         approve_run=ApproveRun(graph),
         get_run_status=GetRunStatus(graph),
+        run_repository=run_repository,
+        db_manager=db_manager,
         graph=graph,
         validation=validation,
         publisher=publisher,
