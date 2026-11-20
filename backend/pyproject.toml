@@ -18,7 +18,7 @@ dependencies = [
     "langgraph-checkpoint-postgres>=2.0.0",
     "psycopg[binary]>=3.2",
     "psycopg-pool>=3.2",
-    "sqlalchemy>=2.0",
+    "sqlalchemy[asyncio]>=2.0",
 ]
 
 [project.optional-dependencies]
@@ -46,3 +46,4 @@ select = ["E", "F", "I", "B", "UP", "S"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
