@@ -10,12 +10,16 @@ from app.main import create_app
 
 
 class FakeApproveRun:
-    def __init__(self, result: ApproveResult | None = None, error: Exception | None = None) -> None:
+    def __init__(
+        self, result: ApproveResult | None = None, error: Exception | None = None
+    ) -> None:
         self.result = result
         self.error = error
         self.calls: list[tuple] = []
 
-    async def execute(self, run_id: str, decision: ApprovalDecision, feedback: str = "") -> ApproveResult:
+    async def execute(
+        self, run_id: str, decision: ApprovalDecision, feedback: str = ""
+    ) -> ApproveResult:
         self.calls.append((run_id, decision, feedback))
         if self.error:
             raise self.error
@@ -29,7 +33,9 @@ class FakeApproveRun:
 
 
 class FakeGetRunStatus:
-    def __init__(self, result: RunStatusResult | None = None, error: Exception | None = None) -> None:
+    def __init__(
+        self, result: RunStatusResult | None = None, error: Exception | None = None
+    ) -> None:
         self.result = result
         self.error = error
 
@@ -66,7 +72,9 @@ def test_get_run_success() -> None:
 
 def test_get_run_not_found() -> None:
     app = create_app()
-    app.dependency_overrides[get_run_status] = lambda: FakeGetRunStatus(error=RunNotFoundError("Run not found"))
+    app.dependency_overrides[get_run_status] = lambda: FakeGetRunStatus(
+        error=RunNotFoundError("Run not found")
+    )
 
     response = TestClient(app).get("/api/runs/unknown-run")
     assert response.status_code == 404
@@ -93,7 +101,9 @@ def test_approve_run_success() -> None:
 
 def test_approve_run_not_found() -> None:
     app = create_app()
-    app.dependency_overrides[get_approve_run] = lambda: FakeApproveRun(error=RunNotFoundError("Run not found"))
+    app.dependency_overrides[get_approve_run] = lambda: FakeApproveRun(
+        error=RunNotFoundError("Run not found")
+    )
 
     response = TestClient(app).post(
         "/api/runs/missing/approve",

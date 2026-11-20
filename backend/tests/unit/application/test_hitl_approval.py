@@ -1,5 +1,5 @@
+import pytest
 from langgraph.checkpoint.memory import MemorySaver
-from langgraph.types import Command
 
 from app.application.ports.github_port import FileUpdate
 from app.application.use_cases.approve_run import ApproveRun
@@ -10,7 +10,7 @@ from app.application.workflow.graph import build_analysis_graph
 from app.application.workflow.schemas import FindingsOut
 from app.domain.entities.fix_proposal import FileChange, FixProposal
 from app.domain.enums import ApprovalDecision, FixStatus, RunStatus, Severity
-from app.domain.exceptions import RunNotAwaitingApprovalError, RunNotFoundError
+from app.domain.exceptions import RunNotFoundError
 from tests.fakes import FakeGitHub, FakeLLM, finding_out, make_pr
 
 PUBLISHABLE_PROPOSAL = FixProposal(
@@ -171,8 +171,5 @@ async def test_approve_run_unknown_thread_raises_not_found() -> None:
     graph = make_graph(FakeGitHub(make_pr()), FakeEngine(), checkpointer)
 
     approve_use_case = ApproveRun(graph)
-    try:
+    with pytest.raises(RunNotFoundError):
         await approve_use_case.execute("unknown-run", ApprovalDecision.APPROVE)
-        assert False, "Expected RunNotFoundError"
-    except RunNotFoundError:
-        pass

@@ -53,7 +53,7 @@ def build_checkpointer(settings: Settings) -> CheckpointerManager:
             return CheckpointerManager(checkpointer, pool=pool)
         except ImportError:
             logger.warning(
-                "langgraph-checkpoint-postgres or psycopg not installed; falling back to MemorySaver"
+                "Postgres checkpointer packages not installed; falling back to MemorySaver"
             )
         except Exception as exc:
             logger.warning(
