@@ -38,9 +38,7 @@ class GetRunStatus:
         interrupts = [i.value for t in state_snapshot.tasks for i in t.interrupts]
         interrupt_payload = interrupts[0] if interrupts else None
 
-        if interrupt_payload or (
-            state_snapshot.next and "hitl_approval" in state_snapshot.next
-        ):
+        if interrupt_payload or (state_snapshot.next and "hitl_approval" in state_snapshot.next):
             status = RunStatus.AWAITING_APPROVAL
         elif values.get("published_pr_url"):
             status = RunStatus.READY_TO_MERGE

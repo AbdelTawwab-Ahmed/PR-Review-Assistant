@@ -10,9 +10,7 @@ from app.main import create_app
 
 
 class FakeApproveRun:
-    def __init__(
-        self, result: ApproveResult | None = None, error: Exception | None = None
-    ) -> None:
+    def __init__(self, result: ApproveResult | None = None, error: Exception | None = None) -> None:
         self.result = result
         self.error = error
         self.calls: list[tuple] = []

@@ -107,9 +107,7 @@ def build_analysis_graph(deps: WorkflowDeps, checkpointer: Any = None):
         graph.add_conditional_edges("score_risk", after_risk, ["plan_fixes", END])
         graph.add_conditional_edges("plan_fixes", after_plan, ["apply_fixes", END])
         graph.add_conditional_edges("apply_fixes", after_apply_fixes, ["hitl_approval", END])
-        graph.add_conditional_edges(
-            "hitl_approval", after_hitl, ["update_pr", "plan_fixes", END]
-        )
+        graph.add_conditional_edges("hitl_approval", after_hitl, ["update_pr", "plan_fixes", END])
         graph.add_edge("update_pr", END)
     else:
         graph.add_edge("score_risk", END)
