@@ -8,3 +8,11 @@ class InvalidTransitionError(DomainError):
 
 class InvalidApprovalError(DomainError):
     """Raised when an approval decision is applied outside the approval stage."""
+
+
+class RunNotFoundError(DomainError):
+    """Raised when a run cannot be found in state."""
+
+
+class RunNotAwaitingApprovalError(DomainError):
+    """Raised when a run is not currently waiting for approval."""

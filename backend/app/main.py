@@ -8,7 +8,7 @@ from app.core.config import get_settings
 from app.core.container import build_container
 from app.core.errors import register_error_handlers
 from app.core.logging import configure_logging
-from app.interfaces.api.routers import dev, health, webhooks
+from app.interfaces.api.routers import approvals, dev, health, runs, webhooks
 
 
 @asynccontextmanager
@@ -19,6 +19,8 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     container = build_container(settings)
     app.state.container = container
     app.state.cache = container.cache
+
+    await container.checkpointer_manager.setup()
 
     try:
         yield
@@ -47,6 +49,8 @@ def create_app() -> FastAPI:
 
     app.include_router(health.router, prefix=settings.api_prefix)
     app.include_router(webhooks.router, prefix=settings.api_prefix)
+    app.include_router(approvals.router, prefix=settings.api_prefix)
+    app.include_router(runs.router, prefix=settings.api_prefix)
 
     if settings.environment == "development":
         app.include_router(dev.router, prefix=settings.api_prefix)

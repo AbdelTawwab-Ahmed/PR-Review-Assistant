@@ -19,6 +19,8 @@ class AnalysisResult:
     impact: ImpactReport | None
     notes: tuple[str, ...]
     fix_proposal: FixProposal | None = None
+    run_id: str = ""
+    awaiting_approval: bool = False
 
 
 class AnalyzePullRequest:
@@ -31,13 +33,17 @@ class AnalyzePullRequest:
         pr_number: int,
         *,
         propose_fixes: bool = False,
+        run_id: str | None = None,
     ) -> AnalysisResult:
+        tid = run_id or f"{repo_full_name}#{pr_number}"
         state = await self._graph.ainvoke(
             {
+                "run_id": tid,
                 "repo_full_name": repo_full_name,
                 "pr_number": pr_number,
                 "fix_requested": propose_fixes,
-            }
+            },
+            config={"configurable": {"thread_id": tid}},
         )
 
         pr: PullRequest = state["pr"]
@@ -50,6 +56,13 @@ class AnalyzePullRequest:
                 summary="No findings qualify for automatic fixing.",
             )
 
+        is_awaiting = bool(
+            proposal
+            and proposal.publishable
+            and not state.get("published_pr_url")
+            and not state.get("approval_decision")
+        )
+
         return AnalysisResult(
             repo_full_name=pr.repo_full_name,
             pr_number=pr.number,
@@ -59,4 +72,6 @@ class AnalyzePullRequest:
             impact=state.get("impact"),
             notes=tuple(state.get("notes", [])),
             fix_proposal=proposal,
+            run_id=tid,
+            awaiting_approval=is_awaiting,
         )

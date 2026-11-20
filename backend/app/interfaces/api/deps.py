@@ -3,6 +3,8 @@ from typing import Annotated
 from fastapi import Depends, Request
 
 from app.application.ports.cache_port import CachePort
+from app.application.use_cases.approve_run import ApproveRun
+from app.application.use_cases.get_run_status import GetRunStatus
 from app.application.use_cases.handle_pr_event import HandlePullRequestEvent
 from app.core.config import Settings, get_settings
 from app.core.container import Container
@@ -24,11 +26,33 @@ def get_handle_pr_event(
     return container.handle_pr_event
 
 
+def get_approve_run(
+    container: Annotated[Container, Depends(get_container)],
+) -> ApproveRun:
+    return container.approve_run
+
+
+def get_run_status(
+    container: Annotated[Container, Depends(get_container)],
+) -> GetRunStatus:
+    return container.get_run_status
+
+
 CacheDep = Annotated[CachePort, Depends(get_cache)]
 
 HandlePREventDep = Annotated[
     HandlePullRequestEvent,
     Depends(get_handle_pr_event),
+]
+
+ApproveRunDep = Annotated[
+    ApproveRun,
+    Depends(get_approve_run),
+]
+
+GetRunStatusDep = Annotated[
+    GetRunStatus,
+    Depends(get_run_status),
 ]
 
 

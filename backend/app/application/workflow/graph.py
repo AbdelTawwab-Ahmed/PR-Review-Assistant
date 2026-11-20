@@ -1,3 +1,5 @@
+from typing import Any
+
 from langgraph.graph import END, START, StateGraph
 from langgraph.types import Send
 
@@ -9,12 +11,15 @@ from app.application.workflow.nodes.aggregate_findings import aggregate_findings
 from app.application.workflow.nodes.analyze_chunk import make_analyze_chunk
 from app.application.workflow.nodes.apply_fixes import make_apply_fixes
 from app.application.workflow.nodes.fetch_context import make_fetch_context
+from app.application.workflow.nodes.hitl_approval import make_hitl_approval
 from app.application.workflow.nodes.impact_analysis import make_impact_analysis
 from app.application.workflow.nodes.plan_analysis import make_plan_analysis
 from app.application.workflow.nodes.plan_fixes import make_plan_fixes
 from app.application.workflow.nodes.score_risk import score_risk
 from app.application.workflow.nodes.static_analysis import make_static_analysis
+from app.application.workflow.nodes.update_pr import make_update_pr
 from app.application.workflow.state import ReviewState
+from app.domain.enums import ApprovalDecision
 
 CHUNK_AGENTS = ("reviewer", "security")
 
@@ -48,7 +53,23 @@ def after_plan(state: ReviewState) -> str:
     return "apply_fixes" if plan is not None and not plan.is_empty else END
 
 
-def build_analysis_graph(deps: WorkflowDeps):
+def after_apply_fixes(state: ReviewState) -> str:
+    proposal = state.get("proposal")
+    if proposal is not None and proposal.publishable:
+        return "hitl_approval"
+    return END
+
+
+def after_hitl(state: ReviewState) -> str:
+    decision = state.get("approval_decision")
+    if decision == ApprovalDecision.APPROVE:
+        return "update_pr"
+    if decision == ApprovalDecision.REQUEST_CHANGES:
+        return "plan_fixes"
+    return END
+
+
+def build_analysis_graph(deps: WorkflowDeps, checkpointer: Any = None):
     chunk_agents = {"reviewer": ReviewerAgent(deps.llm), "security": SecurityAgent(deps.llm)}
     destinations = ["analyze_chunk", "impact_analysis", "aggregate_findings"]
 
@@ -80,9 +101,16 @@ def build_analysis_graph(deps: WorkflowDeps):
     if deps.fix_engine is not None:
         graph.add_node("plan_fixes", make_plan_fixes(deps.fix_min_severity, deps.fix_max_files))
         graph.add_node("apply_fixes", make_apply_fixes(deps.fix_engine))
+        graph.add_node("hitl_approval", make_hitl_approval())
+        graph.add_node("update_pr", make_update_pr(deps.publisher))
+
         graph.add_conditional_edges("score_risk", after_risk, ["plan_fixes", END])
         graph.add_conditional_edges("plan_fixes", after_plan, ["apply_fixes", END])
-        graph.add_edge("apply_fixes", END)
+        graph.add_conditional_edges("apply_fixes", after_apply_fixes, ["hitl_approval", END])
+        graph.add_conditional_edges(
+            "hitl_approval", after_hitl, ["update_pr", "plan_fixes", END]
+        )
+        graph.add_edge("update_pr", END)
     else:
         graph.add_edge("score_risk", END)
-    return graph.compile()
+    return graph.compile(checkpointer=checkpointer)
