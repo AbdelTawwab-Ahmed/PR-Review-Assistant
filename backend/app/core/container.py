@@ -1,3 +1,4 @@
+import logging
 from dataclasses import dataclass
 from typing import Any
 
@@ -5,6 +6,7 @@ from app.application.fix_engine import FixEngine, FixSettings
 from app.application.ports.analyzer_port import AnalyzerPort
 from app.application.ports.cache_port import CachePort
 from app.application.ports.repositories import ReviewRunRepository
+from app.application.ports.sandbox_port import SandboxPort
 from app.application.use_cases.analyze_pull_request import AnalyzePullRequest
 from app.application.use_cases.approve_run import ApproveRun
 from app.application.use_cases.get_run_status import GetRunStatus
@@ -28,9 +30,15 @@ from app.infrastructure.persistence.checkpointer import CheckpointerManager, bui
 from app.infrastructure.persistence.database import DatabaseManager, build_database_manager
 from app.infrastructure.persistence.repositories import build_review_run_repository
 from app.infrastructure.sandbox.docker_sandbox import DockerSandbox, SandboxLimits
+from app.infrastructure.sandbox.dynamic_sessions_sandbox import (
+    DynamicSessionsConfig,
+    DynamicSessionsSandbox,
+)
 from app.infrastructure.sandbox.pytest_runner import PytestRunner
 from app.infrastructure.sandbox.workspace import WorkspaceFactory
 from app.infrastructure.sandbox.workspace_files import WorkspaceFiles
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -44,6 +52,7 @@ class Container:
     approve_run: ApproveRun
     get_run_status: GetRunStatus
     run_repository: ReviewRunRepository
+    _dynamic_sessions: DynamicSessionsSandbox | None = None
     db_manager: DatabaseManager | None = None
     graph: Any = None
     validation: ValidatePullRequest | None = None
@@ -53,8 +62,47 @@ class Container:
         await self.github.aclose()
         await self.cache.close()
         await self.checkpointer_manager.aclose()
+        if self._dynamic_sessions is not None:
+            await self._dynamic_sessions.aclose()
         if self.db_manager is not None:
             await self.db_manager.aclose()
+
+
+def _build_sandbox(settings: Settings) -> SandboxPort:
+    """Build the configured sandbox backend.
+
+    When ``sandbox_backend`` is ``"dynamic_sessions"`` **and** the pool
+    endpoint is configured, return a ``DynamicSessionsSandbox``.
+    Otherwise fall back to ``DockerSandbox`` with a warning.
+    """
+    if settings.sandbox_backend == "dynamic_sessions":
+        endpoint = settings.dynamic_sessions_pool_endpoint
+        if endpoint:
+            logger.info("using Azure Dynamic Sessions sandbox")
+            return DynamicSessionsSandbox(
+                DynamicSessionsConfig(
+                    pool_endpoint=endpoint,
+                    api_key=(settings.dynamic_sessions_api_key.get_secret_value()),
+                    max_session_seconds=(settings.dynamic_sessions_max_session_seconds),
+                    max_concurrency=(settings.sandbox_max_concurrency),
+                ),
+            )
+        logger.warning(
+            "sandbox_backend is 'dynamic_sessions' but "
+            "DYNAMIC_SESSIONS_POOL_ENDPOINT is not set; "
+            "falling back to Docker"
+        )
+
+    return DockerSandbox(
+        image=settings.sandbox_image,
+        limits=SandboxLimits(
+            memory_mb=settings.sandbox_memory_mb,
+            cpus=settings.sandbox_cpus,
+            pids=settings.sandbox_pids_limit,
+            timeout_seconds=settings.sandbox_timeout_seconds,
+        ),
+        max_concurrency=settings.sandbox_max_concurrency,
+    )
 
 
 def build_container(settings: Settings) -> Container:
@@ -94,19 +142,20 @@ def build_container(settings: Settings) -> Container:
     analyzers: tuple[AnalyzerPort, ...] = ()
     suite_runner: PytestRunner | None = None
     validation: ValidatePullRequest | None = None
+    dynamic_sessions: DynamicSessionsSandbox | None = None
     if settings.sandbox_enabled:
-        sandbox = DockerSandbox(
-            image=settings.sandbox_image,
-            limits=SandboxLimits(
-                memory_mb=settings.sandbox_memory_mb,
-                cpus=settings.sandbox_cpus,
-                pids=settings.sandbox_pids_limit,
-                timeout_seconds=settings.sandbox_timeout_seconds,
-            ),
-            max_concurrency=settings.sandbox_max_concurrency,
+        sandbox = _build_sandbox(settings)
+        if isinstance(sandbox, DynamicSessionsSandbox):
+            dynamic_sessions = sandbox
+        analyzers = (
+            RuffAnalyzer(sandbox),
+            BanditAnalyzer(sandbox),
+            SemgrepAnalyzer(sandbox),
         )
-        analyzers = (RuffAnalyzer(sandbox), BanditAnalyzer(sandbox), SemgrepAnalyzer(sandbox))
-        suite_runner = PytestRunner(sandbox, timeout_seconds=settings.sandbox_test_timeout_seconds)
+        suite_runner = PytestRunner(
+            sandbox,
+            timeout_seconds=settings.sandbox_test_timeout_seconds,
+        )
         validation = ValidatePullRequest(
             github,
             workspaces,
@@ -161,6 +210,7 @@ def build_container(settings: Settings) -> Container:
         approve_run=ApproveRun(graph),
         get_run_status=GetRunStatus(graph),
         run_repository=run_repository,
+        _dynamic_sessions=dynamic_sessions,
         db_manager=db_manager,
         graph=graph,
         validation=validation,

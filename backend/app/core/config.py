@@ -61,6 +61,7 @@ class Settings(BaseSettings):
 
     # Sandbox Configuration
     sandbox_enabled: bool = False
+    sandbox_backend: Literal["docker", "dynamic_sessions"] = "docker"
     sandbox_image: str = "prra-sandbox:latest"
     sandbox_memory_mb: int = 2048
     sandbox_cpus: float = 1.0
@@ -71,6 +72,11 @@ class Settings(BaseSettings):
     sandbox_workspace_max_mb: int = 200
     sandbox_max_files: int = 20000
     sandbox_max_analyzed_files: int = 200
+
+    # Azure Dynamic Sessions Configuration
+    dynamic_sessions_pool_endpoint: str = ""
+    dynamic_sessions_api_key: SecretStr = SecretStr("")
+    dynamic_sessions_max_session_seconds: int = 300
 
 
 @lru_cache
