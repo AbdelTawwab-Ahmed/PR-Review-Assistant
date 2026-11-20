@@ -202,10 +202,7 @@ def test_normalize_database_url() -> None:
         normalize_database_url("postgres://user:pass@host:5432/db")
         == "postgresql+psycopg://user:pass@host:5432/db"
     )
-    assert (
-        normalize_database_url("sqlite+aiosqlite:///test.db")
-        == "sqlite+aiosqlite:///test.db"
-    )
+    assert normalize_database_url("sqlite+aiosqlite:///test.db") == "sqlite+aiosqlite:///test.db"
 
 
 def test_build_review_run_repository_fallback() -> None:

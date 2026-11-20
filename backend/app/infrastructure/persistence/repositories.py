@@ -50,9 +50,7 @@ def _risk_to_dict(r: RiskReport | None) -> dict[str, Any] | None:
     return {
         "score": r.score,
         "level": r.level.value,
-        "factors": [
-            {"name": f.name, "points": f.points, "reason": f.reason} for f in r.factors
-        ],
+        "factors": [{"name": f.name, "points": f.points, "reason": f.reason} for f in r.factors],
     }
 
 
