@@ -8,9 +8,11 @@ from app.domain.entities.fix_proposal import FixProposal
 from app.domain.entities.impact_report import ImpactReport
 from app.domain.entities.pull_request import PullRequest
 from app.domain.entities.risk_report import RiskReport
+from app.domain.enums import ApprovalDecision
 
 
 class ReviewState(TypedDict, total=False):
+    run_id: str
     repo_full_name: str
     pr_number: int
     pr: PullRequest
@@ -23,6 +25,10 @@ class ReviewState(TypedDict, total=False):
     fix_requested: bool
     fix_plan: FixPlan
     proposal: FixProposal
+    approval_decision: ApprovalDecision
+    approval_feedback: str
+    published_branch: str
+    published_pr_url: str
 
 
 class ChunkTask(TypedDict):

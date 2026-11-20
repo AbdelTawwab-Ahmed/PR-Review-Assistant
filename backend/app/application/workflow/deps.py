@@ -5,6 +5,7 @@ from app.application.ports.analyzer_port import AnalyzerPort
 from app.application.ports.github_port import GitHubPort
 from app.application.ports.llm_port import LLMPort
 from app.application.ports.sandbox_port import WorkspaceProvider
+from app.application.use_cases.publish_fix import PublishFix
 from app.domain.enums import Severity
 
 
@@ -20,6 +21,7 @@ class WorkflowDeps:
     fix_engine: FixEngine | None = None
     fix_min_severity: Severity = Severity.MEDIUM
     fix_max_files: int = 5
+    publisher: PublishFix | None = None
 
     @property
     def static_analysis_enabled(self) -> bool:

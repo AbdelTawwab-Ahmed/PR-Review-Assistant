@@ -2,7 +2,6 @@ import asyncio
 import logging
 from typing import Any, TypeVar
 
-from langchain_openai import AzureChatOpenAI
 from pydantic import BaseModel, SecretStr
 
 from app.application.ports.llm_port import LLMError, ModelTier
@@ -40,6 +39,8 @@ class AzureOpenAILLM:
     def _model(self, deployment: str) -> Any:
         # Built lazily so the app starts even when Azure OpenAI is not configured yet.
         if deployment not in self._models:
+            from langchain_openai import AzureChatOpenAI
+
             self._models[deployment] = AzureChatOpenAI(
                 azure_endpoint=self._endpoint,
                 api_key=self._api_key,

@@ -26,6 +26,10 @@ class Settings(BaseSettings):
     cache_backend: Literal["redis", "memory"] = "redis"
     cache_ttl_seconds: int = 86400
 
+    # Persistence / Database Configuration
+    database_url: SecretStr = SecretStr("")
+    checkpointer_backend: Literal["postgres", "memory"] = "memory"
+
     # GitHub Configuration
     github_webhook_secret: SecretStr = SecretStr("")
     github_token: SecretStr = SecretStr("")

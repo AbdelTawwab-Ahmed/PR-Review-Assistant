@@ -1,9 +1,12 @@
 from dataclasses import dataclass
+from typing import Any
 
 from app.application.fix_engine import FixEngine, FixSettings
 from app.application.ports.analyzer_port import AnalyzerPort
 from app.application.ports.cache_port import CachePort
 from app.application.use_cases.analyze_pull_request import AnalyzePullRequest
+from app.application.use_cases.approve_run import ApproveRun
+from app.application.use_cases.get_run_status import GetRunStatus
 from app.application.use_cases.handle_pr_event import HandlePullRequestEvent
 from app.application.use_cases.publish_fix import PublishFix
 from app.application.use_cases.validate_pull_request import ValidatePullRequest
@@ -20,6 +23,7 @@ from app.infrastructure.github.client import GitHubClient
 from app.infrastructure.llm.azure_openai import AzureOpenAILLM
 from app.infrastructure.llm.model_router import ModelRouter
 from app.infrastructure.llm.token_tracker import TokenTracker
+from app.infrastructure.persistence.checkpointer import CheckpointerManager, build_checkpointer
 from app.infrastructure.sandbox.docker_sandbox import DockerSandbox, SandboxLimits
 from app.infrastructure.sandbox.pytest_runner import PytestRunner
 from app.infrastructure.sandbox.workspace import WorkspaceFactory
@@ -33,12 +37,17 @@ class Container:
     handle_pr_event: HandlePullRequestEvent
     analysis: AnalyzePullRequest
     token_tracker: TokenTracker
+    checkpointer_manager: CheckpointerManager
+    approve_run: ApproveRun
+    get_run_status: GetRunStatus
+    graph: Any = None
     validation: ValidatePullRequest | None = None
     publisher: PublishFix | None = None
 
     async def aclose(self) -> None:
         await self.github.aclose()
         await self.cache.close()
+        await self.checkpointer_manager.aclose()
 
 
 def build_container(settings: Settings) -> Container:
@@ -99,6 +108,8 @@ def build_container(settings: Settings) -> Container:
             max_files=settings.sandbox_max_analyzed_files,
         )
 
+    publisher = PublishFix(github)
+
     fix_engine = FixEngine(
         workspaces=workspaces,
         files=WorkspaceFiles(),
@@ -112,6 +123,9 @@ def build_container(settings: Settings) -> Container:
             run_tests=settings.fix_run_tests,
         ),
     )
+
+    checkpointer_manager = build_checkpointer(settings)
+
     graph = build_analysis_graph(
         WorkflowDeps(
             github=github,
@@ -124,7 +138,9 @@ def build_container(settings: Settings) -> Container:
             fix_engine=fix_engine,
             fix_min_severity=settings.fix_min_severity,
             fix_max_files=settings.fix_max_files,
-        )
+            publisher=publisher,
+        ),
+        checkpointer=checkpointer_manager.checkpointer,
     )
     return Container(
         cache=cache,
@@ -132,6 +148,10 @@ def build_container(settings: Settings) -> Container:
         handle_pr_event=handle_pr_event,
         analysis=AnalyzePullRequest(graph),
         token_tracker=tracker,
+        checkpointer_manager=checkpointer_manager,
+        approve_run=ApproveRun(graph),
+        get_run_status=GetRunStatus(graph),
+        graph=graph,
         validation=validation,
-        publisher=PublishFix(github),
+        publisher=publisher,
     )
