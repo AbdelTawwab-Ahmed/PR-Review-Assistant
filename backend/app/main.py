@@ -21,6 +21,8 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     app.state.cache = container.cache
 
     await container.checkpointer_manager.setup()
+    if container.db_manager is not None:
+        await container.db_manager.setup()
 
     try:
         yield
