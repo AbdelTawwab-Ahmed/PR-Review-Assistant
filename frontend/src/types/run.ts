@@ -60,10 +60,11 @@ export interface FixPlan {
 }
 
 export interface FixProposal {
-  plan_summary: string;
+  plan_summary?: string;
+  summary?: string;
   changes: FileChange[];
-  explanation: string;
-  status: string;
+  explanation?: string;
+  status?: string;
 }
 
 export interface ReviewRunItem {
