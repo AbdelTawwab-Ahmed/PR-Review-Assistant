@@ -26,6 +26,10 @@ from app.infrastructure.github.client import GitHubClient
 from app.infrastructure.llm.azure_openai import AzureOpenAILLM
 from app.infrastructure.llm.model_router import ModelRouter
 from app.infrastructure.llm.token_tracker import TokenTracker
+from app.infrastructure.observability.telemetry import (
+    TelemetryManager,
+    build_telemetry,
+)
 from app.infrastructure.persistence.checkpointer import CheckpointerManager, build_checkpointer
 from app.infrastructure.persistence.database import DatabaseManager, build_database_manager
 from app.infrastructure.persistence.repositories import build_review_run_repository
@@ -52,6 +56,7 @@ class Container:
     approve_run: ApproveRun
     get_run_status: GetRunStatus
     run_repository: ReviewRunRepository
+    telemetry: TelemetryManager | None = None
     _dynamic_sessions: DynamicSessionsSandbox | None = None
     db_manager: DatabaseManager | None = None
     graph: Any = None
@@ -62,6 +67,8 @@ class Container:
         await self.github.aclose()
         await self.cache.close()
         await self.checkpointer_manager.aclose()
+        if self.telemetry is not None:
+            await self.telemetry.aclose()
         if self._dynamic_sessions is not None:
             await self._dynamic_sessions.aclose()
         if self.db_manager is not None:
@@ -183,6 +190,7 @@ def build_container(settings: Settings) -> Container:
     checkpointer_manager = build_checkpointer(settings)
     db_manager = build_database_manager(settings)
     run_repository = build_review_run_repository(settings, db_manager)
+    telemetry = build_telemetry(settings)
 
     graph = build_analysis_graph(
         WorkflowDeps(
@@ -210,6 +218,7 @@ def build_container(settings: Settings) -> Container:
         approve_run=ApproveRun(graph),
         get_run_status=GetRunStatus(graph),
         run_repository=run_repository,
+        telemetry=telemetry,
         _dynamic_sessions=dynamic_sessions,
         db_manager=db_manager,
         graph=graph,
