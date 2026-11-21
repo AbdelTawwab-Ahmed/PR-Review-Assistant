@@ -1,3 +1,4 @@
+import asyncio
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
@@ -8,7 +9,7 @@ from app.core.config import get_settings
 from app.core.container import build_container
 from app.core.errors import register_error_handlers
 from app.core.logging import configure_logging
-from app.interfaces.api.routers import approvals, dev, health, runs, webhooks
+from app.interfaces.api.routers import approvals, dev, health, repos, runs, webhooks
 
 
 @asynccontextmanager
@@ -24,9 +25,15 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     if container.db_manager is not None:
         await container.db_manager.setup()
 
+    monitor_task = None
+    if container.repo_monitor is not None:
+        monitor_task = asyncio.create_task(container.repo_monitor.run_loop())
+
     try:
         yield
     finally:
+        if monitor_task is not None:
+            monitor_task.cancel()
         await container.aclose()
 
 
@@ -53,6 +60,7 @@ def create_app() -> FastAPI:
     app.include_router(webhooks.router, prefix=settings.api_prefix)
     app.include_router(approvals.router, prefix=settings.api_prefix)
     app.include_router(runs.router, prefix=settings.api_prefix)
+    app.include_router(repos.router, prefix=settings.api_prefix)
 
     if settings.environment == "development":
         app.include_router(dev.router, prefix=settings.api_prefix)

@@ -1,7 +1,8 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useRuns } from '../hooks/useRuns';
 import { triggerRun } from '../api/runs';
+import { getListeningRepos, startListeningRepo, stopListeningRepo } from '../api/repos';
 import { StatusBadge } from '../components/StatusBadge';
 import { StatsOverview } from '../components/StatsOverview';
 import type { RunStatus } from '../types/run';
@@ -10,12 +11,10 @@ type FilterTab = 'all' | 'awaiting' | 'ready' | 'running';
 
 function parsePrUrl(input: string): { repo: string; prNumber: number } | null {
   const trimmed = input.trim();
-  // Match full url: https://github.com/owner/repo/pull/123
   const urlMatch = trimmed.match(/github\.com\/([^/]+)\/([^/]+)\/pull\/(\d+)/i);
   if (urlMatch) {
     return { repo: `${urlMatch[1]}/${urlMatch[2]}`, prNumber: parseInt(urlMatch[3], 10) };
   }
-  // Match owner/repo#123 or owner/repo/pull/123
   const shortMatch = trimmed.match(/^([a-zA-Z0-9_.-]+)\/([a-zA-Z0-9_.-]+)(?:#|\/pull\/)(\d+)$/i);
   if (shortMatch) {
     return { repo: `${shortMatch[1]}/${shortMatch[2]}`, prNumber: parseInt(shortMatch[3], 10) };
@@ -36,7 +35,20 @@ export const RunsPage: React.FC = () => {
   const [isTriggering, setIsTriggering] = useState(false);
   const [triggerMsg, setTriggerMsg] = useState<{ type: 'success' | 'error'; text: string; link?: string } | null>(null);
 
+  // Repository Listener State
+  const [repoListenInput, setRepoListenInput] = useState('');
+  const [isListeningLoading, setIsListeningLoading] = useState(false);
+  const [monitoredRepos, setMonitoredRepos] = useState<string[]>([]);
+  const [listenMsg, setListenMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
   const { data: runs, isLoading, error, refetch, isFetching } = useRuns(activeRepo, activePr);
+
+  // Load monitored repositories on mount
+  useEffect(() => {
+    getListeningRepos()
+      .then((res) => setMonitoredRepos(res.repositories))
+      .catch(() => {});
+  }, []);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -73,7 +85,6 @@ export const RunsPage: React.FC = () => {
         link: res.dashboard_url,
       });
       setTriggerUrl('');
-      // Refresh list after brief moment
       setTimeout(() => refetch(), 1000);
     } catch (err: any) {
       setTriggerMsg({
@@ -82,6 +93,41 @@ export const RunsPage: React.FC = () => {
       });
     } finally {
       setIsTriggering(false);
+    }
+  };
+
+  const handleStartListening = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setListenMsg(null);
+    if (!repoListenInput.trim()) return;
+
+    try {
+      setIsListeningLoading(true);
+      const res = await startListeningRepo(repoListenInput.trim());
+      setListenMsg({
+        type: 'success',
+        text: res.message,
+      });
+      setRepoListenInput('');
+      const updated = await getListeningRepos();
+      setMonitoredRepos(updated.repositories);
+      refetch();
+    } catch (err: any) {
+      setListenMsg({
+        type: 'error',
+        text: err?.message || 'Failed to listen to repository.',
+      });
+    } finally {
+      setIsListeningLoading(false);
+    }
+  };
+
+  const handleStopListening = async (repo: string) => {
+    try {
+      await stopListeningRepo(repo);
+      setMonitoredRepos((prev) => prev.filter((r) => r !== repo));
+    } catch (err) {
+      console.error(err);
     }
   };
 
@@ -139,57 +185,98 @@ export const RunsPage: React.FC = () => {
       {/* KPI Stats Overview Cards */}
       <StatsOverview runs={runs || []} />
 
-      {/* Analyze ANY Pull Request Card */}
+      {/* Repository Listener Card (Continuous Monitoring) */}
       <div className="analyze-pr-card">
         <div className="analyze-pr-header">
-          <div className="analyze-pr-badge">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <circle cx="12" cy="12" r="10" />
-              <line x1="12" y1="8" x2="12" y2="12" />
-              <line x1="12" y1="16" x2="12.01" y2="16" />
-            </svg>
-            Universal PR Analyzer
+          <div className="analyze-pr-badge listener-badge">
+            <span className="pulse-green-dot" />
+            Active Repository Listener
           </div>
-          <h3 className="analyze-pr-title">Review Any Repository Link</h3>
+          <h3 className="analyze-pr-title">Listen for Any Pull Request on Any Repository</h3>
           <p className="analyze-pr-subtitle">
-            Paste any public or authorized GitHub Pull Request URL to run an on-demand multi-agent security and code review.
+            Provide any repository URL (e.g. <code>https://github.com/AbdelTawwab-Ahmed/pr-test</code>). The assistant will automatically listen for every pull request opened or updated, and immediately review it.
           </p>
         </div>
 
-        <form onSubmit={handleTriggerAnyPr} className="analyze-pr-form">
+        <form onSubmit={handleStartListening} className="analyze-pr-form">
           <div className="analyze-input-wrap">
             <svg className="github-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22" />
             </svg>
             <input
               type="text"
-              placeholder="https://github.com/owner/repo/pull/123  or  owner/repo#123"
-              value={triggerUrl}
-              onChange={(e) => setTriggerUrl(e.target.value)}
+              placeholder="Enter repo link (e.g. https://github.com/owner/repo or owner/repo)"
+              value={repoListenInput}
+              onChange={(e) => setRepoListenInput(e.target.value)}
               className="analyze-pr-input"
-              disabled={isTriggering}
+              disabled={isListeningLoading}
             />
           </div>
-          <button type="submit" disabled={isTriggering || !triggerUrl.trim()} className="btn btn-primary analyze-submit-btn">
-            {isTriggering ? (
+          <button type="submit" disabled={isListeningLoading || !repoListenInput.trim()} className="btn btn-primary analyze-submit-btn">
+            {isListeningLoading ? (
               <>
                 <div className="spinner small" />
-                <span>Launching Agents...</span>
+                <span>Connecting...</span>
               </>
             ) : (
               <>
-                <span>🚀 Analyze PR</span>
+                <span>🎧 Start Listening</span>
               </>
             )}
           </button>
         </form>
 
+        {listenMsg && (
+          <div className={`analyze-pr-msg ${listenMsg.type}`}>
+            <span>{listenMsg.text}</span>
+          </div>
+        )}
+
+        {/* Monitored Repositories List */}
+        {monitoredRepos.length > 0 && (
+          <div className="monitored-repos-container">
+            <span className="monitored-title">Currently Listening To ({monitoredRepos.length}):</span>
+            <div className="monitored-chips">
+              {monitoredRepos.map((repo) => (
+                <div key={repo} className="monitored-chip">
+                  <span className="pulse-green-dot small" />
+                  <span className="chip-repo-name">{repo}</span>
+                  <button
+                    onClick={() => handleStopListening(repo)}
+                    className="chip-remove-btn"
+                    title="Stop listening to this repository"
+                  >
+                    &times;
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Direct Single PR Link Analyzer */}
+      <div className="analyze-single-pr-bar">
+        <form onSubmit={handleTriggerAnyPr} className="analyze-single-form">
+          <span className="single-pr-label">⚡ Direct PR Review:</span>
+          <input
+            type="text"
+            placeholder="Paste PR URL: https://github.com/owner/repo/pull/123"
+            value={triggerUrl}
+            onChange={(e) => setTriggerUrl(e.target.value)}
+            className="single-pr-input"
+            disabled={isTriggering}
+          />
+          <button type="submit" disabled={isTriggering || !triggerUrl.trim()} className="btn btn-secondary btn-sm">
+            {isTriggering ? 'Analyzing...' : 'Run Review'}
+          </button>
+        </form>
         {triggerMsg && (
-          <div className={`analyze-pr-msg ${triggerMsg.type}`}>
+          <div className={`analyze-pr-msg ${triggerMsg.type} compact-msg`}>
             <span>{triggerMsg.text}</span>
             {triggerMsg.link && (
               <Link to={triggerMsg.link} className="view-run-btn">
-                View Analysis &rarr;
+                View &rarr;
               </Link>
             )}
           </div>
@@ -313,7 +400,7 @@ export const RunsPage: React.FC = () => {
           <p className="empty-desc">
             {runs && runs.length > 0
               ? 'Try modifying your filter parameters or clearing the search.'
-              : 'Paste any GitHub Pull Request link above to launch an instant AI review, or connect your repository webhook.'}
+              : 'Add any repository above to start listening for pull requests in real time.'}
           </p>
           {(!runs || runs.length === 0) && (
             <div className="empty-webhook-hint">

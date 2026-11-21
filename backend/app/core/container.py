@@ -7,6 +7,7 @@ from app.application.ports.analyzer_port import AnalyzerPort
 from app.application.ports.cache_port import CachePort
 from app.application.ports.repositories import ReviewRunRepository
 from app.application.ports.sandbox_port import SandboxPort
+from app.application.services.repo_monitor import RepoMonitorService
 from app.application.use_cases.analyze_pull_request import AnalyzePullRequest
 from app.application.use_cases.approve_run import ApproveRun
 from app.application.use_cases.get_run_status import GetRunStatus
@@ -62,8 +63,11 @@ class Container:
     graph: Any = None
     validation: ValidatePullRequest | None = None
     publisher: PublishFix | None = None
+    repo_monitor: RepoMonitorService | None = None
 
     async def aclose(self) -> None:
+        if self.repo_monitor is not None:
+            self.repo_monitor.stop()
         await self.github.aclose()
         await self.cache.close()
         await self.checkpointer_manager.aclose()
@@ -210,6 +214,13 @@ def build_container(settings: Settings) -> Container:
         dedup_ttl_seconds=settings.cache_ttl_seconds,
     )
 
+    repo_monitor = RepoMonitorService(
+        github=github,
+        cache=cache,
+        handle_pr_event=handle_pr_event,
+        poll_interval_seconds=45,
+    )
+
     return Container(
         cache=cache,
         github=github,
@@ -226,4 +237,5 @@ def build_container(settings: Settings) -> Container:
         graph=graph,
         validation=validation,
         publisher=publisher,
+        repo_monitor=repo_monitor,
     )

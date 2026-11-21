@@ -35,6 +35,11 @@ class GitHubPort(Protocol):
         number: int,
     ) -> PullRequest: ...
 
+    async def list_open_pulls(
+        self,
+        repo_full_name: str,
+    ) -> list[dict[str, Any]]: ...
+
     async def post_comment(
         self,
         repo_full_name: str,

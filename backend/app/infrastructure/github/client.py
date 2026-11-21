@@ -81,6 +81,12 @@ class GitHubClient:
             from_fork=(head_repo is not None and head_repo.lower() != base_repo.lower()),
         )
 
+    async def list_open_pulls(
+        self,
+        repo_full_name: str,
+    ) -> list[dict[str, Any]]:
+        return await self._get_json(f"/repos/{repo_full_name}/pulls?state=open")
+
     async def download_archive(
         self,
         repo_full_name: str,
