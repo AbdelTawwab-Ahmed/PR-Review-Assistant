@@ -78,6 +78,11 @@ class Settings(BaseSettings):
     dynamic_sessions_api_key: SecretStr = SecretStr("")
     dynamic_sessions_max_session_seconds: int = 300
 
+    # Azure Application Insights & Observability
+    applicationinsights_connection_string: SecretStr = SecretStr("")
+    telemetry_enabled: bool = True
+    telemetry_service_name: str = "pr-review-assistant"
+
 
 @lru_cache
 def get_settings() -> Settings:
