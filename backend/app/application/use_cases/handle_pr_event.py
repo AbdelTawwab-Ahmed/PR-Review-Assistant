@@ -34,9 +34,6 @@ class HandlePullRequestEvent:
         if event.action not in HANDLED_ACTIONS or event.draft:
             return EventOutcome.IGNORED
 
-        if self._bot_login and event.sender.lower() == self._bot_login:
-            return EventOutcome.IGNORED
-
         if is_bot_branch(event.head_branch):
             return EventOutcome.IGNORED
 

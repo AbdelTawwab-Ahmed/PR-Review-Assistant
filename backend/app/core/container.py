@@ -21,7 +21,7 @@ from app.infrastructure.analyzers.bandit import BanditAnalyzer
 from app.infrastructure.analyzers.ruff import RuffAnalyzer
 from app.infrastructure.analyzers.semgrep import SemgrepAnalyzer
 from app.infrastructure.cache.cache import build_cache
-from app.infrastructure.dispatch.logging_dispatcher import LoggingRunDispatcher
+from app.infrastructure.dispatch.asyncio_dispatcher import AsyncioRunDispatcher
 from app.infrastructure.github.client import GitHubClient
 from app.infrastructure.llm.azure_openai import AzureOpenAILLM
 from app.infrastructure.llm.model_router import ModelRouter
@@ -120,13 +120,6 @@ def build_container(settings: Settings) -> Container:
         cache=cache,
         cache_ttl_seconds=settings.cache_ttl_seconds,
     )
-    handle_pr_event = HandlePullRequestEvent(
-        cache,
-        LoggingRunDispatcher(),
-        bot_login=settings.github_bot_login,
-        dedup_ttl_seconds=settings.cache_ttl_seconds,
-    )
-
     tracker = TokenTracker()
     llm = AzureOpenAILLM(
         endpoint=settings.azure_openai_endpoint,
@@ -208,11 +201,20 @@ def build_container(settings: Settings) -> Container:
         ),
         checkpointer=checkpointer_manager.checkpointer,
     )
+    analysis = AnalyzePullRequest(graph)
+    dispatcher = AsyncioRunDispatcher(analysis, run_repository, github)
+    handle_pr_event = HandlePullRequestEvent(
+        cache,
+        dispatcher,
+        bot_login=settings.github_bot_login,
+        dedup_ttl_seconds=settings.cache_ttl_seconds,
+    )
+
     return Container(
         cache=cache,
         github=github,
         handle_pr_event=handle_pr_event,
-        analysis=AnalyzePullRequest(graph),
+        analysis=analysis,
         token_tracker=tracker,
         checkpointer_manager=checkpointer_manager,
         approve_run=ApproveRun(graph),
