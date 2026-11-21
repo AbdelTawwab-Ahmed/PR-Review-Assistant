@@ -24,3 +24,19 @@ export async function submitApproval(
     body: JSON.stringify({ decision, feedback }),
   });
 }
+
+export interface TriggerResponse {
+  status: string;
+  run_id: string;
+  repo: string;
+  pr_number: number;
+  head_sha: string;
+  dashboard_url: string;
+}
+
+export async function triggerRun(repoFullName: string, prNumber: number): Promise<TriggerResponse> {
+  return api<TriggerResponse>('/runs/trigger', {
+    method: 'POST',
+    body: JSON.stringify({ repo_full_name: repoFullName, pr_number: prNumber }),
+  });
+}

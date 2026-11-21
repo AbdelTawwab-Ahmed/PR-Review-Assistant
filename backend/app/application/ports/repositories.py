@@ -32,3 +32,12 @@ class ReviewRunRepository(Protocol):
     ) -> Sequence[ReviewRun]:
         """List runs for a specific pull request, ordered by created_at descending."""
         ...
+
+    async def list_all(
+        self,
+        *,
+        limit: int = 50,
+        offset: int = 0,
+    ) -> Sequence[ReviewRun]:
+        """List all runs across all repositories, ordered by updated_at descending."""
+        ...

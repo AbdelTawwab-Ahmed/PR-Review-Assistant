@@ -185,6 +185,22 @@ class PostgresReviewRunRepository:
             result = await session.execute(stmt)
             return [_model_to_entity(m) for m in result.scalars().all()]
 
+    async def list_all(
+        self,
+        *,
+        limit: int = 50,
+        offset: int = 0,
+    ) -> Sequence[ReviewRun]:
+        async with self._db.session() as session:
+            stmt = (
+                select(ReviewRunModel)
+                .order_by(desc(ReviewRunModel.updated_at))
+                .limit(limit)
+                .offset(offset)
+            )
+            result = await session.execute(stmt)
+            return [_model_to_entity(m) for m in result.scalars().all()]
+
 
 class InMemoryReviewRunRepository:
     def __init__(self) -> None:
@@ -221,6 +237,16 @@ class InMemoryReviewRunRepository:
         ]
         matches.sort(key=lambda r: r.created_at, reverse=True)
         return matches[:limit]
+
+    async def list_all(
+        self,
+        *,
+        limit: int = 50,
+        offset: int = 0,
+    ) -> Sequence[ReviewRun]:
+        matches = list(self._runs.values())
+        matches.sort(key=lambda r: r.updated_at, reverse=True)
+        return matches[offset : offset + limit]
 
 
 def build_review_run_repository(

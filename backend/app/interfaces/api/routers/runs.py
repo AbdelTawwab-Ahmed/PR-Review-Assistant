@@ -30,7 +30,7 @@ async def list_runs(
     elif repo_full_name:
         runs = await repository.list_by_repo(repo_full_name, limit=limit)
     else:
-        runs = []
+        runs = await repository.list_all(limit=limit)
     return [asdict(r) for r in runs]
 
 

@@ -1,11 +1,27 @@
 import React, { useState, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { useRuns } from '../hooks/useRuns';
+import { triggerRun } from '../api/runs';
 import { StatusBadge } from '../components/StatusBadge';
 import { StatsOverview } from '../components/StatsOverview';
 import type { RunStatus } from '../types/run';
 
 type FilterTab = 'all' | 'awaiting' | 'ready' | 'running';
+
+function parsePrUrl(input: string): { repo: string; prNumber: number } | null {
+  const trimmed = input.trim();
+  // Match full url: https://github.com/owner/repo/pull/123
+  const urlMatch = trimmed.match(/github\.com\/([^/]+)\/([^/]+)\/pull\/(\d+)/i);
+  if (urlMatch) {
+    return { repo: `${urlMatch[1]}/${urlMatch[2]}`, prNumber: parseInt(urlMatch[3], 10) };
+  }
+  // Match owner/repo#123 or owner/repo/pull/123
+  const shortMatch = trimmed.match(/^([a-zA-Z0-9_.-]+)\/([a-zA-Z0-9_.-]+)(?:#|\/pull\/)(\d+)$/i);
+  if (shortMatch) {
+    return { repo: `${shortMatch[1]}/${shortMatch[2]}`, prNumber: parseInt(shortMatch[3], 10) };
+  }
+  return null;
+}
 
 export const RunsPage: React.FC = () => {
   const [repoInput, setRepoInput] = useState('');
@@ -14,6 +30,11 @@ export const RunsPage: React.FC = () => {
   const [activeRepo, setActiveRepo] = useState<string | undefined>(undefined);
   const [activePr, setActivePr] = useState<number | undefined>(undefined);
   const [selectedTab, setSelectedTab] = useState<FilterTab>('all');
+
+  // Trigger any PR state
+  const [triggerUrl, setTriggerUrl] = useState('');
+  const [isTriggering, setIsTriggering] = useState(false);
+  const [triggerMsg, setTriggerMsg] = useState<{ type: 'success' | 'error'; text: string; link?: string } | null>(null);
 
   const { data: runs, isLoading, error, refetch, isFetching } = useRuns(activeRepo, activePr);
 
@@ -29,6 +50,39 @@ export const RunsPage: React.FC = () => {
     setActiveRepo(undefined);
     setActivePr(undefined);
     setSelectedTab('all');
+  };
+
+  const handleTriggerAnyPr = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setTriggerMsg(null);
+    const parsed = parsePrUrl(triggerUrl);
+    if (!parsed) {
+      setTriggerMsg({
+        type: 'error',
+        text: 'Invalid format. Please enter a full GitHub PR URL (e.g. https://github.com/owner/repo/pull/123) or owner/repo#123',
+      });
+      return;
+    }
+
+    try {
+      setIsTriggering(true);
+      const res = await triggerRun(parsed.repo, parsed.prNumber);
+      setTriggerMsg({
+        type: 'success',
+        text: `Analysis launched for ${parsed.repo} #${parsed.prNumber}! Multi-agent workflow running.`,
+        link: res.dashboard_url,
+      });
+      setTriggerUrl('');
+      // Refresh list after brief moment
+      setTimeout(() => refetch(), 1000);
+    } catch (err: any) {
+      setTriggerMsg({
+        type: 'error',
+        text: err?.message || 'Failed to trigger PR review. Ensure repository is accessible.',
+      });
+    } finally {
+      setIsTriggering(false);
+    }
   };
 
   const filteredRuns = useMemo(() => {
@@ -84,6 +138,63 @@ export const RunsPage: React.FC = () => {
 
       {/* KPI Stats Overview Cards */}
       <StatsOverview runs={runs || []} />
+
+      {/* Analyze ANY Pull Request Card */}
+      <div className="analyze-pr-card">
+        <div className="analyze-pr-header">
+          <div className="analyze-pr-badge">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <circle cx="12" cy="12" r="10" />
+              <line x1="12" y1="8" x2="12" y2="12" />
+              <line x1="12" y1="16" x2="12.01" y2="16" />
+            </svg>
+            Universal PR Analyzer
+          </div>
+          <h3 className="analyze-pr-title">Review Any Repository Link</h3>
+          <p className="analyze-pr-subtitle">
+            Paste any public or authorized GitHub Pull Request URL to run an on-demand multi-agent security and code review.
+          </p>
+        </div>
+
+        <form onSubmit={handleTriggerAnyPr} className="analyze-pr-form">
+          <div className="analyze-input-wrap">
+            <svg className="github-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22" />
+            </svg>
+            <input
+              type="text"
+              placeholder="https://github.com/owner/repo/pull/123  or  owner/repo#123"
+              value={triggerUrl}
+              onChange={(e) => setTriggerUrl(e.target.value)}
+              className="analyze-pr-input"
+              disabled={isTriggering}
+            />
+          </div>
+          <button type="submit" disabled={isTriggering || !triggerUrl.trim()} className="btn btn-primary analyze-submit-btn">
+            {isTriggering ? (
+              <>
+                <div className="spinner small" />
+                <span>Launching Agents...</span>
+              </>
+            ) : (
+              <>
+                <span>🚀 Analyze PR</span>
+              </>
+            )}
+          </button>
+        </form>
+
+        {triggerMsg && (
+          <div className={`analyze-pr-msg ${triggerMsg.type}`}>
+            <span>{triggerMsg.text}</span>
+            {triggerMsg.link && (
+              <Link to={triggerMsg.link} className="view-run-btn">
+                View Analysis &rarr;
+              </Link>
+            )}
+          </div>
+        )}
+      </div>
 
       {/* Search and Tabs Toolbar */}
       <div className="control-bar-card">
@@ -172,29 +283,23 @@ export const RunsPage: React.FC = () => {
       )}
 
       {error && (
-        <div className="error-glass-card">
-          <div className="error-icon-box">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <circle cx="12" cy="12" r="10" />
-              <line x1="12" y1="8" x2="12" y2="12" />
-              <line x1="12" y1="16" x2="12.01" y2="16" />
-            </svg>
+        <div className="alert-error-card">
+          <div className="alert-icon">⚠️</div>
+          <div className="alert-text">
+            <strong>Failed to connect with Backend:</strong> {(error as Error).message}
           </div>
-          <div>
-            <h4 className="error-title">Database Query Interrupted</h4>
-            <p className="error-desc">{(error as Error).message}</p>
-          </div>
-          <button onClick={() => refetch()} className="btn btn-secondary btn-sm ml-auto">
-            Retry
+          <button onClick={() => refetch()} className="btn btn-secondary btn-sm">
+            Retry Connection
           </button>
         </div>
       )}
 
+      {/* Empty State */}
       {!isLoading && !error && filteredRuns.length === 0 && (
-        <div className="empty-glass-state">
-          <div className="empty-illustration">
-            <div className="empty-circle-glow">
-              <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+        <div className="empty-runs-card">
+          <div className="empty-icon-wrap">
+            <div className="empty-icon-circle">
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
                 <circle cx="18" cy="18" r="3" />
                 <circle cx="6" cy="6" r="3" />
                 <path d="M13 6h3a2 2 0 0 1 2 2v7" />
@@ -208,7 +313,7 @@ export const RunsPage: React.FC = () => {
           <p className="empty-desc">
             {runs && runs.length > 0
               ? 'Try modifying your filter parameters or clearing the search.'
-              : 'When a Pull Request is opened or updated on GitHub, Azure App Service triggers the LangGraph agent swarm to analyze code changes in real time.'}
+              : 'Paste any GitHub Pull Request link above to launch an instant AI review, or connect your repository webhook.'}
           </p>
           {(!runs || runs.length === 0) && (
             <div className="empty-webhook-hint">
@@ -282,33 +387,18 @@ export const RunsPage: React.FC = () => {
                     </td>
 
                     <td>
-                      {findingsCount > 0 ? (
-                        <span className="findings-chip">
-                          <span className="findings-count-num">{findingsCount}</span> issues
-                        </span>
-                      ) : (
-                        <span className="clean-chip">
-                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
-                            <polyline points="20 6 9 17 4 12" />
-                          </svg>
-                          Clean
-                        </span>
-                      )}
+                      <span className={`findings-pill ${findingsCount > 0 ? 'has-findings' : 'zero-findings'}`}>
+                        {findingsCount} {findingsCount === 1 ? 'finding' : 'findings'}
+                      </span>
                     </td>
 
                     <td>
-                      <span className="sha-badge">{run.head_sha.slice(0, 7)}</span>
+                      <code className="commit-chip">{run.head_sha.slice(0, 7)}</code>
                     </td>
 
                     <td className="text-right">
-                      <Link
-                        to={`/runs/${runId}`}
-                        className={`btn btn-sm ${isAwaiting ? 'btn-amber-glow' : 'btn-ghost'}`}
-                      >
-                        {isAwaiting ? 'Authorize' : 'View Run'}
-                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                          <polyline points="9 18 15 12 9 6" />
-                        </svg>
+                      <Link to={`/runs/${runId}`} className="btn btn-secondary btn-sm">
+                        Inspect
                       </Link>
                     </td>
                   </tr>
