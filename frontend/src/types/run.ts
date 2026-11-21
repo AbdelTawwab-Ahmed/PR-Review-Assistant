@@ -29,6 +29,7 @@ export interface RiskReport {
 }
 
 export interface Finding {
+  id?: string;
   category: string;
   severity: Severity;
   title: string;
@@ -37,12 +38,25 @@ export interface Finding {
   line_start: number | null;
   line_end: number | null;
   suggestion: string;
+  source?: string;
 }
 
 export interface FileChange {
   path: string;
   original_content: string;
   updated_content: string;
+}
+
+export interface FixAction {
+  file_path: string;
+  description: string;
+  finding_ids: string[];
+}
+
+export interface FixPlan {
+  actions: FixAction[];
+  rationale: string;
+  attempt: number;
 }
 
 export interface FixProposal {
@@ -58,9 +72,11 @@ export interface ReviewRunItem {
   pr_number: number;
   head_sha: string;
   status: RunStatus;
-  created_at: string;
-  updated_at: string;
-  risk: RiskReport | null;
+  created_at?: string;
+  updated_at?: string;
+  risk?: RiskReport | null;
+  findings?: Finding[];
+  fix_plan?: FixPlan | null;
 }
 
 export interface RunDetail {
@@ -76,6 +92,8 @@ export interface RunDetail {
   published_branch: string | null;
   published_pr_url: string | null;
   notes: string[];
+  findings?: Finding[];
+  fix_plan?: FixPlan | null;
   interrupt_payload?: {
     type?: string;
     message?: string;

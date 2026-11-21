@@ -26,30 +26,28 @@ export const ApprovalModal: React.FC<ApprovalModalProps> = ({
   };
 
   return (
-    <div className="modal-overlay">
-      <div className="modal-container">
-        <div className="modal-header">
-          <div className="modal-title-wrap">
-            <div className="hitl-icon">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#F59E0B" strokeWidth="2">
-                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-              </svg>
-            </div>
-            <div>
-              <h3 className="modal-title">Human-in-the-Loop Review</h3>
-              <p className="modal-subtitle">Review and authorize changes before they are applied</p>
-            </div>
+    <div className="modal-backdrop-blur">
+      <div className="modal-dialog-elevated">
+        <div className="modal-header-section">
+          <div className="modal-icon-badge">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#F59E0B" strokeWidth="2.2">
+              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+            </svg>
           </div>
-          <button onClick={onClose} className="modal-close-btn" disabled={isLoading}>
+          <div>
+            <h3 className="modal-heading">Human-in-the-Loop Authorization</h3>
+            <p className="modal-subheading">
+              Review and authorize the AI agent's proposed remediation before publishing to GitHub
+            </p>
+          </div>
+          <button onClick={onClose} className="modal-close-x" disabled={isLoading}>
             &times;
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="modal-form">
-          <div className="decision-selector">
-            <label
-              className={`decision-option ${decision === 'approve' ? 'selected-approve' : ''}`}
-            >
+        <form onSubmit={handleSubmit} className="modal-form-content">
+          <div className="decision-cards-grid">
+            <label className={`decision-card ${decision === 'approve' ? 'selected-approve' : ''}`}>
               <input
                 type="radio"
                 name="decision"
@@ -57,15 +55,16 @@ export const ApprovalModal: React.FC<ApprovalModalProps> = ({
                 checked={decision === 'approve'}
                 onChange={() => setDecision('approve')}
               />
-              <div className="option-text">
-                <span className="option-title">Approve & Publish</span>
-                <span className="option-desc">Commit fixes to a new PR branch and publish for merge.</span>
+              <div className="card-indicator" />
+              <div className="card-body">
+                <span className="card-title">✅ Approve & Push Fix</span>
+                <span className="card-desc">
+                  Authorize the changes. The agent will create a fix commit and push it to the PR branch.
+                </span>
               </div>
             </label>
 
-            <label
-              className={`decision-option ${decision === 'request_changes' ? 'selected-changes' : ''}`}
-            >
+            <label className={`decision-card ${decision === 'request_changes' ? 'selected-changes' : ''}`}>
               <input
                 type="radio"
                 name="decision"
@@ -73,15 +72,16 @@ export const ApprovalModal: React.FC<ApprovalModalProps> = ({
                 checked={decision === 'request_changes'}
                 onChange={() => setDecision('request_changes')}
               />
-              <div className="option-text">
-                <span className="option-title">Request Changes</span>
-                <span className="option-desc">Instruct the AI agent to replan fixes with your feedback.</span>
+              <div className="card-indicator" />
+              <div className="card-body">
+                <span className="card-title">🔄 Request Changes</span>
+                <span className="card-desc">
+                  Ask the multi-agent fixer to replan and adapt the solution using your feedback below.
+                </span>
               </div>
             </label>
 
-            <label
-              className={`decision-option ${decision === 'reject' ? 'selected-reject' : ''}`}
-            >
+            <label className={`decision-card ${decision === 'reject' ? 'selected-reject' : ''}`}>
               <input
                 type="radio"
                 name="decision"
@@ -89,33 +89,36 @@ export const ApprovalModal: React.FC<ApprovalModalProps> = ({
                 checked={decision === 'reject'}
                 onChange={() => setDecision('reject')}
               />
-              <div className="option-text">
-                <span className="option-title">Reject Proposal</span>
-                <span className="option-desc">Discard this fix proposal without applying modifications.</span>
+              <div className="card-indicator" />
+              <div className="card-body">
+                <span className="card-title">⛔ Reject Proposal</span>
+                <span className="card-desc">
+                  Dismiss the proposed changes without modifying the PR branch or committing files.
+                </span>
               </div>
             </label>
           </div>
 
-          <div className="feedback-group">
-            <label htmlFor="feedback-input" className="feedback-label">
-              Feedback & Instructions {decision === 'request_changes' ? '(Required)' : '(Optional)'}
+          <div className="feedback-input-section">
+            <label htmlFor="feedback-text" className="feedback-label-title">
+              Guidance & Reviewer Notes {decision === 'request_changes' ? '(Required)' : '(Optional)'}
             </label>
             <textarea
-              id="feedback-input"
-              rows={4}
-              value={feedback}
-              onChange={(e) => setFeedback(e.target.value)}
+              id="feedback-text"
+              rows={3}
               placeholder={
                 decision === 'request_changes'
-                  ? 'Specify what needs to be changed in the proposed code...'
-                  : 'Add notes for the team or PR description...'
+                  ? 'Explain what the agent should modify or preserve...'
+                  : 'Add optional review comments for the audit log...'
               }
-              required={decision === 'request_changes'}
+              value={feedback}
+              onChange={(e) => setFeedback(e.target.value)}
               className="feedback-textarea"
+              required={decision === 'request_changes'}
             />
           </div>
 
-          <div className="modal-actions">
+          <div className="modal-action-buttons">
             <button
               type="button"
               onClick={onClose}
@@ -126,19 +129,20 @@ export const ApprovalModal: React.FC<ApprovalModalProps> = ({
             </button>
             <button
               type="submit"
-              disabled={isLoading}
-              className={`btn btn-primary ${decision}`}
+              disabled={isLoading || (decision === 'request_changes' && !feedback.trim())}
+              className={`btn ${decision === 'reject' ? 'btn-danger' : 'btn-primary'}`}
             >
               {isLoading ? (
-                <span className="btn-loading">
-                  <span className="spinner" /> Submitting...
-                </span>
+                <>
+                  <span className="spinner-sm" />
+                  Broadcasting to Agent...
+                </>
               ) : decision === 'approve' ? (
-                'Approve & Commit'
+                'Confirm & Publish to GitHub'
               ) : decision === 'request_changes' ? (
-                'Request Changes'
+                'Submit Feedback to Fixer'
               ) : (
-                'Reject Proposal'
+                'Confirm Rejection'
               )}
             </button>
           </div>
