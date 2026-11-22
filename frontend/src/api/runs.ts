@@ -11,7 +11,7 @@ export async function getRuns(repo?: string, prNumber?: number): Promise<ReviewR
 }
 
 export async function getRun(runId: string): Promise<RunDetail> {
-  return api<RunDetail>(`/runs/${runId}`);
+  return api<RunDetail>(`/runs/detail?run_id=${encodeURIComponent(runId)}`);
 }
 
 export async function submitApproval(
@@ -19,9 +19,9 @@ export async function submitApproval(
   decision: ApprovalDecision,
   feedback: string = ''
 ): Promise<ApproveResponse> {
-  return api<ApproveResponse>(`/runs/${runId}/approve`, {
+  return api<ApproveResponse>('/runs/approve', {
     method: 'POST',
-    body: JSON.stringify({ decision, feedback }),
+    body: JSON.stringify({ decision, feedback, run_id: runId }),
   });
 }
 

@@ -84,7 +84,16 @@ async def trigger_run(
     }
 
 
-@router.get("/{run_id}")
+@router.get("/detail")
+async def get_run_detail(
+    run_id: str,
+    use_case: GetRunStatusDep,
+    repository: RunRepoDep,
+) -> dict[str, Any]:
+    return await get_run(run_id, use_case, repository)
+
+
+@router.get("/{run_id:path}")
 async def get_run(
     run_id: str,
     use_case: GetRunStatusDep,

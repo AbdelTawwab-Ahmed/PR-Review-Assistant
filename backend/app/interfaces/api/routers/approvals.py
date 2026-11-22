@@ -15,17 +15,21 @@ router = APIRouter(prefix="/runs", tags=["approvals"])
 class ApprovalRequest(BaseModel):
     decision: ApprovalDecision
     feedback: str = ""
+    run_id: str | None = None
 
 
-@router.post("/{run_id}/approve")
-async def approve(
-    run_id: str,
+@router.post("/approve")
+async def approve_direct(
     body: ApprovalRequest,
     use_case: ApproveRunDep,
+    run_id: str | None = None,
 ) -> dict[str, Any]:
+    target_id = run_id or body.run_id
+    if not target_id:
+        raise NotFoundError("run_id is required")
     try:
         result = await use_case.execute(
-            run_id=run_id,
+            run_id=target_id,
             decision=body.decision,
             feedback=body.feedback,
         )
@@ -35,3 +39,12 @@ async def approve(
         raise ConflictError(str(exc)) from exc
 
     return asdict(result)
+
+
+@router.post("/{run_id:path}/approve")
+async def approve(
+    run_id: str,
+    body: ApprovalRequest,
+    use_case: ApproveRunDep,
+) -> dict[str, Any]:
+    return await approve_direct(body, use_case, run_id=run_id)
