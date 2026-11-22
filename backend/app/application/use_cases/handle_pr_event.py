@@ -34,11 +34,17 @@ class HandlePullRequestEvent:
         if event.action not in HANDLED_ACTIONS or event.draft:
             return EventOutcome.IGNORED
 
-        if self._bot_login and event.sender.lower() == self._bot_login:
-            return EventOutcome.IGNORED
-
         if is_bot_branch(event.head_branch):
             return EventOutcome.IGNORED
+
+        if self._bot_login and event.sender.lower() == self._bot_login:
+            # If the user runs the bot using their personal account's token,
+            # only ignore automated bot fix PRs (branch starting with prra/fix-).
+            # Never ignore user feature branches (e.g. feature/error).
+            if is_bot_branch(event.head_branch) or (
+                event.title and event.title.startswith("[PRRA Fix]")
+            ):
+                return EventOutcome.IGNORED
 
         key = f"webhook:delivery:{event.delivery_id}"
         if not await self._cache.set_if_absent(key, True, self._ttl):
