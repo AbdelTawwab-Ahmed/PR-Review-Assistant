@@ -21,6 +21,7 @@ class AnalysisResult:
     fix_proposal: FixProposal | None = None
     run_id: str = ""
     awaiting_approval: bool = False
+    awaiting_plan_approval: bool = False
 
 
 class AnalyzePullRequest:
@@ -62,16 +63,21 @@ class AnalyzePullRequest:
             and not state.get("published_pr_url")
             and not state.get("approval_decision")
         )
+        final_findings = state.get("final_findings", [])
+        is_awaiting_plan = bool(
+            final_findings and not state.get("plan_approval_decision") and not is_awaiting
+        )
 
         return AnalysisResult(
             repo_full_name=pr.repo_full_name,
             pr_number=pr.number,
             head_sha=pr.head_sha,
-            findings=tuple(state.get("final_findings", [])),
+            findings=tuple(final_findings),
             risk=state["risk"],
             impact=state.get("impact"),
             notes=tuple(state.get("notes", [])),
             fix_proposal=proposal,
             run_id=tid,
             awaiting_approval=is_awaiting,
+            awaiting_plan_approval=is_awaiting_plan,
         )

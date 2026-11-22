@@ -71,7 +71,7 @@ async def trigger_run(
         sender=pr_info.author,
     )
     outcome = await container.handle_pr_event.execute(event)
-    if outcome == EventOutcome.DUPLICATE:
+    if outcome in (EventOutcome.DUPLICATE, EventOutcome.IGNORED):
         await container.handle_pr_event._dispatcher.dispatch(event)
         outcome = EventOutcome.ACCEPTED
 
@@ -106,6 +106,7 @@ async def get_run(
         run = await repository.get_by_id(run_id) if repository else None
         if run is not None and run.status in (
             RunStatus.READY_TO_MERGE,
+            RunStatus.AWAITING_PLAN_APPROVAL,
             RunStatus.AWAITING_APPROVAL,
             RunStatus.FAILED,
             RunStatus.REJECTED,

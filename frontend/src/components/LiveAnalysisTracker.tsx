@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { getRun } from '../api/runs';
+import { getRun, triggerRun } from '../api/runs';
 import type { RunDetail } from '../types/run';
 
 interface LiveAnalysisTrackerProps {
@@ -36,6 +36,8 @@ export const LiveAnalysisTracker: React.FC<LiveAnalysisTrackerProps> = ({
   const [elapsed, setElapsed] = useState(0);
   const [currentRun, setCurrentRun] = useState<RunDetail | null>(null);
   const [isDone, setIsDone] = useState(false);
+  const [pollError, setPollError] = useState<string | null>(null);
+  const [isRetrying, setIsRetrying] = useState(false);
 
   // Timer
   useEffect(() => {
@@ -49,11 +51,14 @@ export const LiveAnalysisTracker: React.FC<LiveAnalysisTrackerProps> = ({
   useEffect(() => {
     if (!runId) return;
     let isCancelled = false;
+    let errorCount = 0;
 
     const poll = async () => {
       try {
         const detail = await getRun(runId);
         if (isCancelled) return;
+        errorCount = 0;
+        setPollError(null);
         setCurrentRun(detail);
 
         if (
@@ -66,8 +71,16 @@ export const LiveAnalysisTracker: React.FC<LiveAnalysisTrackerProps> = ({
           setIsDone(true);
           onAnalysisCompleted(detail);
         }
-      } catch (err) {
-        console.error('Polling error:', err);
+      } catch (err: unknown) {
+        if (isCancelled) return;
+        errorCount += 1;
+        if (errorCount >= 10) {
+          setPollError(
+            err instanceof Error
+              ? err.message
+              : 'Analysis run was not found or was cancelled on the backend. Please re-analyze.'
+          );
+        }
       }
     };
 
@@ -78,6 +91,20 @@ export const LiveAnalysisTracker: React.FC<LiveAnalysisTrackerProps> = ({
       clearInterval(interval);
     };
   }, [runId, onAnalysisCompleted]);
+
+  const handleRetryRun = async () => {
+    setIsRetrying(true);
+    try {
+      await triggerRun(repo, prNumber);
+      setPollError(null);
+      setElapsed(0);
+      window.location.reload();
+    } catch (err: unknown) {
+      setPollError(err instanceof Error ? err.message : 'Failed to re-trigger analysis');
+    } finally {
+      setIsRetrying(false);
+    }
+  };
 
   // Determine stage progress based on actual backend status
   const getStageState = (index: number): 'completed' | 'active' | 'pending' => {
@@ -183,6 +210,24 @@ export const LiveAnalysisTracker: React.FC<LiveAnalysisTrackerProps> = ({
           );
         })}
       </div>
+
+      {pollError && (
+        <div style={{ marginTop: '1.25rem', padding: '1rem 1.25rem', background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.4)', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem' }}>
+          <div>
+            <div style={{ color: '#ef4444', fontWeight: 700, fontSize: '0.95rem', marginBottom: '0.25rem' }}>⚠️ Analysis Error</div>
+            <div style={{ color: '#fca5a5', fontSize: '0.825rem' }}>
+              {pollError}
+            </div>
+          </div>
+          <button
+            onClick={handleRetryRun}
+            disabled={isRetrying}
+            style={{ padding: '0.5rem 1rem', background: '#ef4444', color: '#fff', border: 'none', borderRadius: '6px', fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' }}
+          >
+            {isRetrying ? 'Triggering...' : 'Re-run Analysis'}
+          </button>
+        </div>
+      )}
 
       {currentRun?.status === 'failed' && (
         <div style={{ marginTop: '1.25rem', padding: '1rem 1.25rem', background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.4)', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem' }}>

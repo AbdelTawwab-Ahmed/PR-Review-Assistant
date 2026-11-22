@@ -185,7 +185,7 @@ async def analyze_repository(
         sender=pr_info.author,
     )
     outcome = await container.handle_pr_event.execute(event)
-    if outcome == EventOutcome.DUPLICATE:
+    if outcome in (EventOutcome.DUPLICATE, EventOutcome.IGNORED):
         await container.handle_pr_event._dispatcher.dispatch(event)
         outcome = EventOutcome.ACCEPTED
     run_id = f"{repo_clean}#{pr_num}#{pr_info.head_sha[:7]}"

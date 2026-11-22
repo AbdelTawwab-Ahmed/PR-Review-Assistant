@@ -1,6 +1,5 @@
 import asyncio
 import logging
-import time
 from datetime import UTC, datetime
 from typing import Any
 
@@ -65,7 +64,7 @@ class AsyncioRunDispatcher:
 
         try:
             logger.info("Executing LangGraph analysis for %s", run_id)
-            thread_id = f"{run_id}-{int(time.time())}"
+            thread_id = run_id
             result = await self._analysis.execute(
                 event.repo_full_name,
                 event.number,
@@ -80,6 +79,8 @@ class AsyncioRunDispatcher:
 
             if result.awaiting_approval:
                 run.status = RunStatus.AWAITING_APPROVAL
+            elif getattr(result, "awaiting_plan_approval", False):
+                run.status = RunStatus.AWAITING_PLAN_APPROVAL
             else:
                 run.status = RunStatus.READY_TO_MERGE
 
