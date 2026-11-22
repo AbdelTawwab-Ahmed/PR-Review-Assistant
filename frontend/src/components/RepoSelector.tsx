@@ -7,8 +7,8 @@ interface RepoSelectorProps {
 }
 
 export const RepoSelector: React.FC<RepoSelectorProps> = ({ onAnalyze, isAnalyzing }) => {
-  const [inputVal, setInputVal] = useState('https://github.com/AbdelTawwab-Ahmed/pr-test');
-  const [selectedRepo, setSelectedRepo] = useState<string>('AbdelTawwab-Ahmed/pr-test');
+  const [inputVal, setInputVal] = useState('');
+  const [selectedRepo, setSelectedRepo] = useState<string>('');
   const [selectedPr, setSelectedPr] = useState<number | undefined>(undefined);
 
   const [userRepos, setUserRepos] = useState<UserRepoItem[]>([]);

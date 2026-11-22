@@ -194,7 +194,7 @@ export const RunsPage: React.FC = () => {
           </div>
           <h3 className="analyze-pr-title">Listen for Any Pull Request on Any Repository</h3>
           <p className="analyze-pr-subtitle">
-            Provide any repository URL (e.g. <code>https://github.com/AbdelTawwab-Ahmed/pr-test</code>). The assistant will automatically listen for every pull request opened or updated, and immediately review it.
+            Provide any repository URL (e.g. <code>https://github.com/owner/repository</code>). The assistant will automatically listen for every pull request opened or updated, and immediately review it.
           </p>
         </div>
 
