@@ -150,7 +150,12 @@ export const DashboardPage: React.FC = () => {
           </div>
         ) : !runs || runs.length === 0 ? (
           <div className="empty-runs-state">
-            <div className="empty-icon-circle">📂</div>
+            <div className="empty-icon-circle">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <circle cx="12" cy="12" r="10" />
+                <polyline points="12 6 12 12 16 14" />
+              </svg>
+            </div>
             <h4>No Repository Reviews Yet</h4>
             <p>Paste any GitHub repository URL above and click <strong>Analyze Repository</strong> to start your first multi-agent review.</p>
           </div>

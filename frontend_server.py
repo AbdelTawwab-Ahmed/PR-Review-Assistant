@@ -64,7 +64,14 @@ async def serve_spa(full_path: str):
             return FileResponse(file_path)
     index_file = DIST_DIR / "index.html"
     if index_file.is_file():
-        return FileResponse(index_file)
+        return FileResponse(
+            index_file,
+            headers={
+                "Cache-Control": "no-cache, no-store, must-revalidate, max-age=0",
+                "Pragma": "no-cache",
+                "Expires": "0",
+            },
+        )
     return Response(
         content="""<!DOCTYPE html>
 <html>
