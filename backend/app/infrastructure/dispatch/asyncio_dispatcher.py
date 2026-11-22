@@ -1,6 +1,7 @@
 import asyncio
 from datetime import UTC, datetime
 import logging
+import time
 
 from app.application.events import PullRequestEvent
 from app.application.ports.github_port import GitHubPort
@@ -64,11 +65,12 @@ class AsyncioRunDispatcher:
 
         try:
             logger.info("Executing LangGraph analysis for %s", run_id)
+            thread_id = f"{run_id}-{int(time.time())}"
             result = await self._analysis.execute(
                 event.repo_full_name,
                 event.number,
                 propose_fixes=True,
-                run_id=run_id,
+                run_id=thread_id,
             )
 
             # Update run entity with findings and risk

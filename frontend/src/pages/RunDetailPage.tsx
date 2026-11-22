@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useParams, useLocation, Link } from 'react-router-dom';
 import { useRun, useApproveRun } from '../hooks/useRuns';
+import { triggerRun } from '../api/runs';
 import { StatusBadge } from '../components/StatusBadge';
 import { RiskGauge } from '../components/RiskGauge';
 import { DiffViewer } from '../components/DiffViewer';
@@ -26,6 +27,21 @@ export const RunDetailPage: React.FC = () => {
   const [modalStage, setModalStage] = useState<'plan' | 'final'>('final');
   const [actionError, setActionError] = useState<string | null>(null);
   const [copiedSha, setCopiedSha] = useState(false);
+  const [isRerunning, setIsRerunning] = useState(false);
+
+  const handleRerun = async () => {
+    if (!run) return;
+    setIsRerunning(true);
+    setActionError(null);
+    try {
+      await triggerRun(run.repo_full_name, run.pr_number);
+      setTimeout(() => refetch(), 1500);
+    } catch (err: any) {
+      setActionError(err?.message || 'Failed to trigger re-run');
+    } finally {
+      setIsRerunning(false);
+    }
+  };
 
   React.useEffect(() => {
     if (run?.status === 'awaiting_plan_approval') {
@@ -155,6 +171,18 @@ export const RunDetailPage: React.FC = () => {
 
         <div className="detail-header-side">
           <StatusBadge status={run.status as RunStatus} size="lg" />
+          <button
+            onClick={handleRerun}
+            disabled={isRerunning}
+            className="btn btn-primary btn-sm"
+            style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}
+            title="Trigger a fresh autonomous review of this PR"
+          >
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+              <polygon points="5 3 19 12 5 21 5 3" />
+            </svg>
+            {isRerunning ? 'Triggering...' : 'Re-run Review'}
+          </button>
           <button
             onClick={() => refetch()}
             disabled={isFetching}
