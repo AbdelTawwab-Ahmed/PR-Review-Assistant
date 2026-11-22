@@ -47,6 +47,7 @@ export const LiveAnalysisTracker: React.FC<LiveAnalysisTrackerProps> = ({
 
   // Poll backend run status
   useEffect(() => {
+    if (!runId) return;
     let isCancelled = false;
 
     const poll = async () => {
@@ -141,7 +142,7 @@ export const LiveAnalysisTracker: React.FC<LiveAnalysisTrackerProps> = ({
         <div className="tracker-timer-card">
           <span className="timer-label">ELAPSED TIME</span>
           <span className="timer-value">{formatSeconds(elapsed)}</span>
-          <span className="timer-sub">Polling real backend</span>
+          <span className="timer-sub">{runId ? 'Polling real backend' : 'Connecting orchestrator...'}</span>
         </div>
       </div>
 

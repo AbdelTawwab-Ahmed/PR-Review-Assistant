@@ -156,10 +156,17 @@ async def analyze_repository(
         if open_prs:
             pr_num = open_prs[0]["number"]
         else:
-            raise HTTPException(
-                status_code=400,
-                detail=f"No open pull requests found on {repo_clean}. Please open a pull request or specify a PR number.",
-            )
+            try:
+                all_prs = await container.github._get_json(f"/repos/{repo_clean}/pulls?state=all&per_page=5")
+                if all_prs:
+                    pr_num = all_prs[0]["number"]
+            except Exception:
+                pass
+            if pr_num is None:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"No pull requests found on {repo_clean}. Please open a pull request or specify a PR number (e.g. {repo_clean}#1).",
+                )
 
     pr_info = await container.github.get_pull_request(repo_clean, pr_num)
     event = PullRequestEvent(

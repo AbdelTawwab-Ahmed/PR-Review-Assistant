@@ -14,6 +14,7 @@ import type { RunDetail, RunStatus } from '../types/run';
 export const DashboardPage: React.FC = () => {
   const { data: runs, isLoading: isRunsLoading, refetch } = useRuns();
 
+  const trackerRef = React.useRef<HTMLDivElement>(null);
   const [activeAnalysis, setActiveAnalysis] = useState<{
     runId: string;
     repo: string;
@@ -28,6 +29,16 @@ export const DashboardPage: React.FC = () => {
     setAnalysisError(null);
     setCompletedRun(null);
     setIsAnalyzing(true);
+    setActiveAnalysis({
+      runId: '',
+      repo,
+      prNumber: prNumber || 1,
+    });
+
+    // Smoothly reveal and scroll directly to the analysis tracker
+    setTimeout(() => {
+      trackerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 60);
 
     try {
       const res = await analyzeRepository(repo, prNumber);
@@ -39,6 +50,7 @@ export const DashboardPage: React.FC = () => {
     } catch (err: any) {
       setAnalysisError(err?.message || 'Failed to trigger repository analysis. Check repository accessibility.');
       setIsAnalyzing(false);
+      setActiveAnalysis(null);
     }
   };
 
@@ -76,12 +88,14 @@ export const DashboardPage: React.FC = () => {
 
       {/* 2. Repository Analysis Workflow (Live Real-Time Stepper) */}
       {activeAnalysis && isAnalyzing && (
-        <LiveAnalysisTracker
-          runId={activeAnalysis.runId}
-          repo={activeAnalysis.repo}
-          prNumber={activeAnalysis.prNumber}
-          onAnalysisCompleted={handleAnalysisCompleted}
-        />
+        <div ref={trackerRef}>
+          <LiveAnalysisTracker
+            runId={activeAnalysis.runId}
+            repo={activeAnalysis.repo}
+            prNumber={activeAnalysis.prNumber}
+            onAnalysisCompleted={handleAnalysisCompleted}
+          />
+        </div>
       )}
 
       {/* 3. Revealed Completed Analysis Dashboard */}

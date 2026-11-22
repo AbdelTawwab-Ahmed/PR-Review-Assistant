@@ -96,9 +96,10 @@ export const RepoSelector: React.FC<RepoSelectorProps> = ({ onAnalyze, isAnalyzi
     e.preventDefault();
     const parsed = parseRepoString(inputVal);
     if (!parsed) {
-      setValidationError('Please enter a valid GitHub repository URL.');
+      setValidationError('Please enter a valid GitHub repository (e.g. owner/repo or https://github.com/owner/repo)');
       return;
     }
+    setValidationError(null);
     onAnalyze(parsed.repo, selectedPr || parsed.prNum);
   };
 
@@ -143,7 +144,7 @@ export const RepoSelector: React.FC<RepoSelectorProps> = ({ onAnalyze, isAnalyzi
         <button
           type="submit"
           className="btn btn-primary analyze-action-btn"
-          disabled={isAnalyzing || !selectedRepo || !!validationError}
+          disabled={isAnalyzing || !inputVal.trim()}
         >
           {isAnalyzing ? (
             <>
