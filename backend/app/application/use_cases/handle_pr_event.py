@@ -38,12 +38,11 @@ class HandlePullRequestEvent:
             return EventOutcome.IGNORED
 
         if self._bot_login and event.sender.lower() == self._bot_login:
-            # If the user runs the bot using their personal account's token,
-            # only ignore automated bot fix PRs (branch starting with prra/fix-).
-            # Never ignore user feature branches (e.g. feature/error).
-            if is_bot_branch(event.head_branch) or (
-                event.title and event.title.startswith("[PRRA Fix]")
-            ):
+            # If the sender is the repository owner who is using their personal token for the bot,
+            # allow their human branches (like feature/error) to be reviewed.
+            # Only ignore if the sender is an external bot account or a bot fix branch.
+            repo_owner = event.repo_full_name.split("/")[0].lower()
+            if event.sender.lower() != repo_owner:
                 return EventOutcome.IGNORED
 
         key = f"webhook:delivery:{event.delivery_id}"
