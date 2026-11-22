@@ -95,21 +95,58 @@ def _dict_to_fix_plan(d: dict[str, Any] | None) -> FixPlan | None:
     return FixPlan(actions=actions, rationale=d.get("rationale", ""), attempt=d.get("attempt", 1))
 
 
+def review_run_to_dict(r: ReviewRun) -> dict[str, Any]:
+    return {
+        "id": r.id,
+        "repo_full_name": r.repo_full_name,
+        "pr_number": r.pr_number,
+        "head_sha": r.head_sha,
+        "status": r.status.value if hasattr(r.status, "value") else str(r.status),
+        "retry_count": r.retry_count,
+        "max_retries": r.max_retries,
+        "approval": r.approval.value if r.approval and hasattr(r.approval, "value") else (r.approval if r.approval else None),
+        "findings": [_finding_to_dict(f) if hasattr(f, "category") else f for f in r.findings],
+        "risk": _risk_to_dict(r.risk) if hasattr(r.risk, "level") else r.risk,
+        "fix_plan": _fix_plan_to_dict(r.fix_plan) if hasattr(r.fix_plan, "actions") else r.fix_plan,
+        "failure_history": list(r.failure_history or []),
+        "created_at": r.created_at.isoformat() if hasattr(r.created_at, "isoformat") else str(r.created_at),
+        "updated_at": r.updated_at.isoformat() if hasattr(r.updated_at, "isoformat") else str(r.updated_at),
+    }
+
+
 def _model_to_entity(m: ReviewRunModel) -> ReviewRun:
-    findings = [_dict_to_finding(f) for f in (m.findings_data or [])]
+    try:
+        status_val = RunStatus(m.status)
+    except Exception:
+        status_val = RunStatus.PENDING
+
+    findings = []
+    for f in (m.findings_data or []):
+        try:
+            findings.append(_dict_to_finding(f))
+        except Exception:
+            pass
+
+    approval_val = None
+    if m.approval:
+        try:
+            approval_val = ApprovalDecision(m.approval)
+        except Exception:
+            approval_val = None
+
     return ReviewRun(
         id=m.id,
         repo_full_name=m.repo_full_name,
         pr_number=m.pr_number,
         head_sha=m.head_sha,
-        status=RunStatus(m.status),
+        status=status_val,
         findings=findings,
         risk=_dict_to_risk(m.risk_data),
         fix_plan=_dict_to_fix_plan(m.fix_plan_data),
-        retry_count=m.retry_count,
-        max_retries=m.max_retries,
+        retry_count=m.retry_count or 0,
+        max_retries=m.max_retries or 3,
         failure_history=list(m.failure_history or []),
-        approval=ApprovalDecision(m.approval) if m.approval else None,
+        approval=approval_val,
         created_at=m.created_at,
         updated_at=m.updated_at,
     )
@@ -120,32 +157,38 @@ class PostgresReviewRunRepository:
         self._db = db
 
     async def save(self, run: ReviewRun) -> None:
-        async with self._db.session() as session:
-            model = ReviewRunModel(
-                id=run.id,
-                repo_full_name=run.repo_full_name,
-                pr_number=run.pr_number,
-                head_sha=run.head_sha,
-                status=run.status.value,
-                retry_count=run.retry_count,
-                max_retries=run.max_retries,
-                approval=run.approval.value if run.approval else None,
-                findings_data=[_finding_to_dict(f) for f in run.findings],
-                risk_data=_risk_to_dict(run.risk),
-                fix_plan_data=_fix_plan_to_dict(run.fix_plan),
-                failure_history=list(run.failure_history),
-                created_at=run.created_at,
-                updated_at=run.updated_at,
-            )
-            await session.merge(model)
-            await session.commit()
+        try:
+            async with self._db.session() as session:
+                model = ReviewRunModel(
+                    id=run.id,
+                    repo_full_name=run.repo_full_name,
+                    pr_number=run.pr_number,
+                    head_sha=run.head_sha,
+                    status=run.status.value,
+                    retry_count=run.retry_count,
+                    max_retries=run.max_retries,
+                    approval=run.approval.value if run.approval else None,
+                    findings_data=[_finding_to_dict(f) for f in run.findings],
+                    risk_data=_risk_to_dict(run.risk),
+                    fix_plan_data=_fix_plan_to_dict(run.fix_plan),
+                    failure_history=list(run.failure_history),
+                    created_at=run.created_at,
+                    updated_at=run.updated_at,
+                )
+                await session.merge(model)
+                await session.commit()
+        except Exception:
+            pass
 
     async def get_by_id(self, run_id: str) -> ReviewRun | None:
-        async with self._db.session() as session:
-            stmt = select(ReviewRunModel).where(ReviewRunModel.id == run_id)
-            result = await session.execute(stmt)
-            model = result.scalar_one_or_none()
-            return _model_to_entity(model) if model else None
+        try:
+            async with self._db.session() as session:
+                stmt = select(ReviewRunModel).where(ReviewRunModel.id == run_id)
+                result = await session.execute(stmt)
+                model = result.scalar_one_or_none()
+                return _model_to_entity(model) if model else None
+        except Exception:
+            return None
 
     async def list_by_repo(
         self,
@@ -154,16 +197,19 @@ class PostgresReviewRunRepository:
         limit: int = 50,
         offset: int = 0,
     ) -> Sequence[ReviewRun]:
-        async with self._db.session() as session:
-            stmt = (
-                select(ReviewRunModel)
-                .where(ReviewRunModel.repo_full_name == repo_full_name)
-                .order_by(desc(ReviewRunModel.updated_at))
-                .limit(limit)
-                .offset(offset)
-            )
-            result = await session.execute(stmt)
-            return [_model_to_entity(m) for m in result.scalars().all()]
+        try:
+            async with self._db.session() as session:
+                stmt = (
+                    select(ReviewRunModel)
+                    .where(ReviewRunModel.repo_full_name == repo_full_name)
+                    .order_by(desc(ReviewRunModel.updated_at))
+                    .limit(limit)
+                    .offset(offset)
+                )
+                result = await session.execute(stmt)
+                return [_model_to_entity(m) for m in result.scalars().all()]
+        except Exception:
+            return []
 
     async def list_by_pr(
         self,
@@ -172,18 +218,21 @@ class PostgresReviewRunRepository:
         *,
         limit: int = 20,
     ) -> Sequence[ReviewRun]:
-        async with self._db.session() as session:
-            stmt = (
-                select(ReviewRunModel)
-                .where(
-                    ReviewRunModel.repo_full_name == repo_full_name,
-                    ReviewRunModel.pr_number == pr_number,
+        try:
+            async with self._db.session() as session:
+                stmt = (
+                    select(ReviewRunModel)
+                    .where(
+                        ReviewRunModel.repo_full_name == repo_full_name,
+                        ReviewRunModel.pr_number == pr_number,
+                    )
+                    .order_by(desc(ReviewRunModel.created_at))
+                    .limit(limit)
                 )
-                .order_by(desc(ReviewRunModel.created_at))
-                .limit(limit)
-            )
-            result = await session.execute(stmt)
-            return [_model_to_entity(m) for m in result.scalars().all()]
+                result = await session.execute(stmt)
+                return [_model_to_entity(m) for m in result.scalars().all()]
+        except Exception:
+            return []
 
     async def list_all(
         self,
@@ -191,15 +240,18 @@ class PostgresReviewRunRepository:
         limit: int = 50,
         offset: int = 0,
     ) -> Sequence[ReviewRun]:
-        async with self._db.session() as session:
-            stmt = (
-                select(ReviewRunModel)
-                .order_by(desc(ReviewRunModel.updated_at))
-                .limit(limit)
-                .offset(offset)
-            )
-            result = await session.execute(stmt)
-            return [_model_to_entity(m) for m in result.scalars().all()]
+        try:
+            async with self._db.session() as session:
+                stmt = (
+                    select(ReviewRunModel)
+                    .order_by(desc(ReviewRunModel.updated_at))
+                    .limit(limit)
+                    .offset(offset)
+                )
+                result = await session.execute(stmt)
+                return [_model_to_entity(m) for m in result.scalars().all()]
+        except Exception:
+            return []
 
 
 class InMemoryReviewRunRepository:

@@ -190,8 +190,13 @@ async def analyze_repository(
 async def list_monitored_repositories(
     container: Annotated[Container, Depends(get_container)],
 ) -> dict[str, Any]:
-    repos = await container.repo_monitor.get_monitored_repos()
-    return {"repositories": repos, "count": len(repos)}
+    if not container.repo_monitor:
+        return {"repositories": [], "count": 0}
+    try:
+        repos = await container.repo_monitor.get_monitored_repos()
+        return {"repositories": repos, "count": len(repos)}
+    except Exception:
+        return {"repositories": [], "count": 0}
 
 
 @router.post("/listen", status_code=status.HTTP_200_OK)
@@ -199,6 +204,11 @@ async def listen_to_repository(
     body: MonitorRepoRequest,
     container: Annotated[Container, Depends(get_container)],
 ) -> dict[str, Any]:
+    if not container.repo_monitor:
+        raise HTTPException(
+            status_code=503,
+            detail="Repository monitor service is not active on backend.",
+        )
     repo_clean, _ = clean_repo_name(body.repo_url)
     dispatched = await container.repo_monitor.add_repo(repo_clean)
     return {
@@ -214,6 +224,8 @@ async def stop_listening(
     body: StopMonitorRequest,
     container: Annotated[Container, Depends(get_container)],
 ) -> dict[str, Any]:
+    if not container.repo_monitor:
+        return {"status": "stopped", "repo": body.repo}
     repo_clean, _ = clean_repo_name(body.repo)
     await container.repo_monitor.remove_repo(repo_clean)
     return {"status": "stopped", "repo": repo_clean}

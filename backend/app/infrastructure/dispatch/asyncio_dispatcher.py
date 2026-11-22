@@ -91,8 +91,9 @@ class AsyncioRunDispatcher:
                 comment_body.append("### 🔍 Key Findings")
                 for f in result.findings[:5]:
                     sev = getattr(f.severity, "value", str(f.severity))
+                    loc = f"{f.file_path}:{f.line_start}" if f.file_path else "general"
                     comment_body.append(
-                        f"- **[{sev.upper()}]** `{f.file}:{f.line}` — **{f.title}**: {f.description}"
+                        f"- **[{sev.upper()}]** `{loc}` — **{f.title}**: {f.description}"
                     )
                 if len(result.findings) > 5:
                     comment_body.append(

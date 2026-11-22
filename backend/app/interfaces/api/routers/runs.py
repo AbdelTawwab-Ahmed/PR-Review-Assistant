@@ -1,14 +1,19 @@
 from dataclasses import asdict
+import logging
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, status
+from fastapi.encoders import jsonable_encoder
 from pydantic import BaseModel
 
 from app.application.events import PullRequestEvent
 from app.core.container import Container
 from app.core.errors import NotFoundError
 from app.domain.exceptions import RunNotFoundError
+from app.infrastructure.persistence.repositories import review_run_to_dict
 from app.interfaces.api.deps import GetRunStatusDep, RunRepoDep, get_container
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/runs", tags=["runs"])
 
@@ -25,13 +30,17 @@ async def list_runs(
     pr_number: int | None = None,
     limit: int = 50,
 ) -> list[dict[str, Any]]:
-    if repo_full_name and pr_number is not None:
-        runs = await repository.list_by_pr(repo_full_name, pr_number, limit=limit)
-    elif repo_full_name:
-        runs = await repository.list_by_repo(repo_full_name, limit=limit)
-    else:
-        runs = await repository.list_all(limit=limit)
-    return [asdict(r) for r in runs]
+    try:
+        if repo_full_name and pr_number is not None:
+            runs = await repository.list_by_pr(repo_full_name, pr_number, limit=limit)
+        elif repo_full_name:
+            runs = await repository.list_by_repo(repo_full_name, limit=limit)
+        else:
+            runs = await repository.list_all(limit=limit)
+        return [review_run_to_dict(r) for r in runs]
+    except Exception as exc:
+        logger.warning("Error in list_runs: %s", exc)
+        return []
 
 
 @router.post("/trigger", status_code=status.HTTP_202_ACCEPTED)
@@ -74,4 +83,4 @@ async def get_run(
     except RunNotFoundError as exc:
         raise NotFoundError(str(exc)) from exc
 
-    return asdict(result)
+    return jsonable_encoder(asdict(result))
