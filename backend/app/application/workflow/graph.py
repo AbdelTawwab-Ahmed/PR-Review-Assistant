@@ -51,9 +51,11 @@ def after_risk(state: ReviewState) -> str:
     findings = state.get("final_findings", [])
     if not findings:
         return END
+    if not state.get("fix_requested", True):
+        return END
     if state.get("plan_approval_decision") == ApprovalDecision.APPROVE:
         return "plan_fixes"
-    return "hitl_plan_approval" if state.get("fix_requested", True) else END
+    return "hitl_plan_approval"
 
 
 def after_plan_approval(state: ReviewState) -> str:

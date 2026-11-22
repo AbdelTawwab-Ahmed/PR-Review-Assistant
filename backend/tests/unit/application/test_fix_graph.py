@@ -3,7 +3,7 @@ from app.application.workflow.deps import WorkflowDeps
 from app.application.workflow.graph import build_analysis_graph
 from app.application.workflow.schemas import FindingsOut
 from app.domain.entities.fix_proposal import FixProposal
-from app.domain.enums import FixStatus, Severity
+from app.domain.enums import ApprovalDecision, FixStatus, Severity
 from tests.fakes import FakeGitHub, FakeLLM, finding_out, make_pr
 
 VERIFIED = FixProposal(FixStatus.VERIFIED, "abc123", summary="done")
@@ -31,7 +31,14 @@ async def run(engine: FakeEngine, llm: FakeLLM, fix: bool):
     graph = build_analysis_graph(
         WorkflowDeps(github=FakeGitHub(make_pr()), llm=llm, fix_engine=engine)
     )
-    return await graph.ainvoke({"repo_full_name": "org/repo", "pr_number": 1, "fix_requested": fix})
+    return await graph.ainvoke(
+        {
+            "repo_full_name": "org/repo",
+            "pr_number": 1,
+            "fix_requested": fix,
+            "plan_approval_decision": ApprovalDecision.APPROVE,
+        }
+    )
 
 
 async def test_fixes_are_proposed_when_requested() -> None:
