@@ -51,6 +51,8 @@ def after_risk(state: ReviewState) -> str:
     findings = state.get("final_findings", [])
     if not findings:
         return END
+    if state.get("plan_approval_decision") == ApprovalDecision.APPROVE:
+        return "plan_fixes"
     return "hitl_plan_approval" if state.get("fix_requested", True) else END
 
 
@@ -119,7 +121,9 @@ def build_analysis_graph(deps: WorkflowDeps, checkpointer: Any = None):
         graph.add_node("hitl_approval", make_hitl_approval())
         graph.add_node("update_pr", make_update_pr(deps.publisher))
 
-        graph.add_conditional_edges("score_risk", after_risk, ["hitl_plan_approval", END])
+        graph.add_conditional_edges(
+            "score_risk", after_risk, ["hitl_plan_approval", "plan_fixes", END]
+        )
         graph.add_conditional_edges("hitl_plan_approval", after_plan_approval, ["plan_fixes", END])
         graph.add_conditional_edges("plan_fixes", after_plan, ["apply_fixes", END])
         graph.add_conditional_edges("apply_fixes", after_apply_fixes, ["hitl_approval", END])

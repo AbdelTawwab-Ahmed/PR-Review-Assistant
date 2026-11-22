@@ -70,13 +70,16 @@ class AzureOpenAILLM:
         runnable = self._model(deployment).with_structured_output(schema, include_raw=True)
         loop = asyncio.get_running_loop()
 
-        def _execute_in_worker_thread():
-            return runnable.invoke([("system", system), ("user", user)])
-
         async with self._semaphore:
             try:
-                # Execute in multi-threaded worker pool to maximize parallelism
-                result = await loop.run_in_executor(self._executor, _execute_in_worker_thread)
+                if hasattr(runnable, "ainvoke"):
+                    result = await runnable.ainvoke([("system", system), ("user", user)])
+                else:
+
+                    def _execute_in_worker_thread():
+                        return runnable.invoke([("system", system), ("user", user)])
+
+                    result = await loop.run_in_executor(self._executor, _execute_in_worker_thread)
             except Exception as exc:  # the SDK raises many unrelated error types
                 logger.warning("LLM call failed (%s)", label, exc_info=True)
                 raise LLMError(f"{label} call failed: {type(exc).__name__}") from exc

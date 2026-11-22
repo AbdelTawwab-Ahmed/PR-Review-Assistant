@@ -20,7 +20,7 @@ from app.infrastructure.persistence.repositories import (
     _risk_to_dict,
     review_run_to_dict,
 )
-from app.interfaces.api.deps import GetRunStatusDep, RunRepoDep, get_container
+from app.interfaces.api.deps import GetRunStatusDep, RunRepoDep, RunRepoOptDep, get_container
 
 logger = logging.getLogger(__name__)
 
@@ -90,7 +90,7 @@ async def trigger_run(
 async def get_run_detail(
     run_id: str,
     use_case: GetRunStatusDep,
-    repository: RunRepoDep,
+    repository: RunRepoOptDep = None,
 ) -> dict[str, Any]:
     return await get_run(run_id, use_case, repository)
 
@@ -99,11 +99,11 @@ async def get_run_detail(
 async def get_run(
     run_id: str,
     use_case: GetRunStatusDep,
-    repository: RunRepoDep,
+    repository: RunRepoOptDep = None,
 ) -> dict[str, Any]:
     # 1. Fast Repository check
     try:
-        run = await repository.get_by_id(run_id)
+        run = await repository.get_by_id(run_id) if repository else None
         if run is not None and run.status in (
             RunStatus.READY_TO_MERGE,
             RunStatus.AWAITING_APPROVAL,
@@ -146,7 +146,7 @@ async def get_run(
         result = await asyncio.wait_for(use_case.execute(run_id), timeout=3.0)
         result_dict = jsonable_encoder(asdict(result))
         try:
-            if "findings" not in result_dict or not result_dict["findings"]:
+            if repository and ("findings" not in result_dict or not result_dict["findings"]):
                 run = await repository.get_by_id(run_id)
                 if run and run.findings:
                     result_dict["findings"] = [
@@ -161,34 +161,48 @@ async def get_run(
         logger.warning("Error fetching run status from graph for %s: %s", run_id, exc)
 
     # 3. Check Repository entity fallback
-    try:
-        run = await repository.get_by_id(run_id)
-        if run is not None:
-            return jsonable_encoder(
-                {
-                    "run_id": run.id,
-                    "status": run.status.value if hasattr(run.status, "value") else str(run.status),
-                    "repo_full_name": run.repo_full_name,
-                    "pr_number": run.pr_number,
-                    "head_sha": run.head_sha,
-                    "findings_count": len(run.findings),
-                    "findings": [
-                        _finding_to_dict(f) if hasattr(f, "category") else f for f in run.findings
-                    ],
-                    "risk": _risk_to_dict(run.risk) if hasattr(run.risk, "level") else run.risk,
-                    "proposal": _fix_plan_to_dict(run.fix_plan)
-                    if hasattr(run.fix_plan, "actions")
-                    else run.fix_plan,
-                    "approval_decision": run.approval.value
-                    if run.approval and hasattr(run.approval, "value")
-                    else None,
-                    "published_branch": None,
-                    "published_pr_url": None,
-                    "notes": tuple(run.failure_history or ()),
-                    "interrupt_payload": None,
-                }
+    if repository is not None:
+        try:
+            run = await repository.get_by_id(run_id)
+            if run is not None:
+                return jsonable_encoder(
+                    {
+                        "run_id": run.id,
+                        "status": (
+                            run.status.value if hasattr(run.status, "value") else str(run.status)
+                        ),
+                        "repo_full_name": run.repo_full_name,
+                        "pr_number": run.pr_number,
+                        "head_sha": run.head_sha,
+                        "findings_count": len(run.findings),
+                        "findings": [
+                            _finding_to_dict(f) if hasattr(f, "category") else f
+                            for f in run.findings
+                        ],
+                        "risk": (
+                            _risk_to_dict(run.risk) if hasattr(run.risk, "level") else run.risk
+                        ),
+                        "proposal": (
+                            _fix_plan_to_dict(run.fix_plan)
+                            if hasattr(run.fix_plan, "actions")
+                            else run.fix_plan
+                        ),
+                        "approval_decision": (
+                            run.approval.value
+                            if run.approval and hasattr(run.approval, "value")
+                            else None
+                        ),
+                        "published_branch": None,
+                        "published_pr_url": None,
+                        "notes": tuple(run.failure_history or ()),
+                        "interrupt_payload": None,
+                    }
+                )
+        except Exception as exc:
+            logger.warning(
+                "Error fetching run from repository for %s: %s",
+                run_id,
+                exc,
             )
-    except Exception as exc:
-        logger.warning("Error fetching run from repository for %s: %s", run_id, exc)
 
     raise NotFoundError(f"Run {run_id} not found")

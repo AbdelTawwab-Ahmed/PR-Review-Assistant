@@ -203,6 +203,7 @@ class TelemetryManager:
                 )
             except Exception as exc:
                 logger.warning("Azure App Insights exporter setup note: %s", exc)
+                self._enabled = False
                 self._tracer = trace.get_tracer(self._service_name)
         else:
             self._tracer = trace.get_tracer(self._service_name)

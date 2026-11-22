@@ -39,8 +39,8 @@ export const RunDetailPage: React.FC = () => {
     try {
       await triggerRun(run.repo_full_name, run.pr_number);
       setTimeout(() => refetch(), 1500);
-    } catch (err: any) {
-      setActionError(err?.message || 'Failed to trigger re-run');
+    } catch (err: unknown) {
+      setActionError(err instanceof Error ? err.message : 'Failed to trigger re-run');
     } finally {
       setIsRerunning(false);
     }

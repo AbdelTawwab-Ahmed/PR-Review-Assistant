@@ -45,6 +45,13 @@ def get_run_repository(
     return container.run_repository
 
 
+def get_run_repository_opt(request: Request) -> ReviewRunRepository | None:
+    container = getattr(request.app.state, "container", None)
+    if container is not None and hasattr(container, "run_repository"):
+        return container.run_repository
+    return None
+
+
 CacheDep = Annotated[CachePort, Depends(get_cache)]
 
 HandlePREventDep = Annotated[
@@ -65,6 +72,11 @@ GetRunStatusDep = Annotated[
 RunRepoDep = Annotated[
     ReviewRunRepository,
     Depends(get_run_repository),
+]
+
+RunRepoOptDep = Annotated[
+    ReviewRunRepository | None,
+    Depends(get_run_repository_opt),
 ]
 
 

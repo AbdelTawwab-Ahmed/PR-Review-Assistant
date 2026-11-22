@@ -76,7 +76,12 @@ async def test_graph_interrupts_when_proposal_is_publishable() -> None:
 
     config = {"configurable": {"thread_id": "run-test-1"}}
     state = await graph.ainvoke(
-        {"repo_full_name": "org/repo", "pr_number": 1, "fix_requested": True},
+        {
+            "repo_full_name": "org/repo",
+            "pr_number": 1,
+            "fix_requested": True,
+            "plan_approval_decision": ApprovalDecision.APPROVE,
+        },
         config=config,
     )
 
@@ -104,7 +109,12 @@ async def test_approve_run_resumes_and_publishes_fix() -> None:
 
     config = {"configurable": {"thread_id": "run-test-2"}}
     await graph.ainvoke(
-        {"repo_full_name": "org/repo", "pr_number": 1, "fix_requested": True},
+        {
+            "repo_full_name": "org/repo",
+            "pr_number": 1,
+            "fix_requested": True,
+            "plan_approval_decision": ApprovalDecision.APPROVE,
+        },
         config=config,
     )
 
@@ -129,7 +139,12 @@ async def test_reject_run_ends_without_publishing() -> None:
 
     config = {"configurable": {"thread_id": "run-test-3"}}
     await graph.ainvoke(
-        {"repo_full_name": "org/repo", "pr_number": 1, "fix_requested": True},
+        {
+            "repo_full_name": "org/repo",
+            "pr_number": 1,
+            "fix_requested": True,
+            "plan_approval_decision": ApprovalDecision.APPROVE,
+        },
         config=config,
     )
 
@@ -153,7 +168,12 @@ async def test_get_run_status_use_case() -> None:
 
     config = {"configurable": {"thread_id": "run-test-4"}}
     await graph.ainvoke(
-        {"repo_full_name": "org/repo", "pr_number": 1, "fix_requested": True},
+        {
+            "repo_full_name": "org/repo",
+            "pr_number": 1,
+            "fix_requested": True,
+            "plan_approval_decision": ApprovalDecision.APPROVE,
+        },
         config=config,
     )
 
@@ -173,3 +193,23 @@ async def test_approve_run_unknown_thread_raises_not_found() -> None:
     approve_use_case = ApproveRun(graph)
     with pytest.raises(RunNotFoundError):
         await approve_use_case.execute("unknown-run", ApprovalDecision.APPROVE)
+
+
+async def test_stage_1_plan_approval_interrupt() -> None:
+    pr = make_pr()
+    gh = FakePublisherGitHub(pr)
+    engine = FakeEngine(PUBLISHABLE_PROPOSAL)
+    checkpointer = MemorySaver()
+    graph = make_graph(gh, engine, checkpointer)
+
+    config = {"configurable": {"thread_id": "run-test-stage1"}}
+    await graph.ainvoke(
+        {"repo_full_name": "org/repo", "pr_number": 1, "fix_requested": True},
+        config=config,
+    )
+
+    state_snapshot = await graph.aget_state(config)
+    assert len(state_snapshot.tasks) > 0
+    interrupts = [i.value for t in state_snapshot.tasks for i in t.interrupts]
+    assert len(interrupts) == 1
+    assert interrupts[0]["status"] == "awaiting_plan_approval"
