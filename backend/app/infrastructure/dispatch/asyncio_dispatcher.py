@@ -8,6 +8,7 @@ from app.application.ports.repositories import ReviewRunRepository
 from app.application.use_cases.analyze_pull_request import AnalyzePullRequest
 from app.domain.entities.review_run import ReviewRun
 from app.domain.enums import RunStatus
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -20,10 +21,12 @@ class AsyncioRunDispatcher:
         analysis: AnalyzePullRequest,
         repository: ReviewRunRepository,
         github: GitHubPort,
+        telemetry: Any | None = None,
     ) -> None:
         self._analysis = analysis
         self._repository = repository
         self._github = github
+        self._telemetry = telemetry
 
     async def dispatch(self, event: PullRequestEvent) -> None:
         logger.info(
@@ -33,6 +36,16 @@ class AsyncioRunDispatcher:
             event.head_sha[:7],
             event.action,
         )
+        if self._telemetry and getattr(self._telemetry, "is_enabled", False):
+            self._telemetry.track_event(
+                "ReviewRunDispatched",
+                {
+                    "repo": event.repo_full_name,
+                    "pr": str(event.number),
+                    "head_sha": event.head_sha[:7],
+                    "action": event.action,
+                },
+            )
         asyncio.create_task(self._process_pr(event))
 
     async def _process_pr(self, event: PullRequestEvent) -> None:
@@ -70,6 +83,20 @@ class AsyncioRunDispatcher:
 
             await self._repository.save(run)
             logger.info("Run %s completed with status: %s", run_id, run.status)
+
+            if self._telemetry and getattr(self._telemetry, "is_enabled", False):
+                self._telemetry.track_event(
+                    "ReviewRunCompleted",
+                    {
+                        "run_id": run_id,
+                        "repo": event.repo_full_name,
+                        "pr": str(event.number),
+                        "status": run.status.value,
+                        "findings_count": str(len(run.findings)),
+                        "risk_score": str(risk_score),
+                        "risk_level": str(risk_level),
+                    },
+                )
 
             # Post formatted markdown review comment on the PR
             risk_level = (
@@ -132,6 +159,24 @@ class AsyncioRunDispatcher:
 
         except Exception as exc:
             logger.exception("Error processing PR review %s: %s", run_id, exc)
+            if self._telemetry and getattr(self._telemetry, "is_enabled", False):
+                self._telemetry.track_exception(
+                    exc,
+                    {
+                        "run_id": run_id,
+                        "repo": event.repo_full_name,
+                        "pr": str(event.number),
+                    },
+                )
+                self._telemetry.track_event(
+                    "ReviewRunFailed",
+                    {
+                        "run_id": run_id,
+                        "repo": event.repo_full_name,
+                        "pr": str(event.number),
+                        "error": str(exc),
+                    },
+                )
             run.status = RunStatus.FAILED
             run.failure_history.append(str(exc))
             run.updated_at = datetime.now(UTC)

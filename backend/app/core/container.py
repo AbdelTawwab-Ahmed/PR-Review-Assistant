@@ -206,7 +206,7 @@ def build_container(settings: Settings) -> Container:
         checkpointer=checkpointer_manager.checkpointer,
     )
     analysis = AnalyzePullRequest(graph)
-    dispatcher = AsyncioRunDispatcher(analysis, run_repository, github)
+    dispatcher = AsyncioRunDispatcher(analysis, run_repository, github, telemetry=telemetry)
     handle_pr_event = HandlePullRequestEvent(
         cache,
         dispatcher,

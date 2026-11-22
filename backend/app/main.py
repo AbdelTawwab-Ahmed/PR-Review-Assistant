@@ -1,8 +1,9 @@
 import asyncio
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+import time
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import get_settings
@@ -53,6 +54,31 @@ def create_app() -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
+
+    @app.middleware("http")
+    async def app_insights_telemetry_middleware(request: Request, call_next):
+        start_time = time.time()
+        error_msg = None
+        response = None
+        try:
+            response = await call_next(request)
+            return response
+        except Exception as exc:
+            error_msg = str(exc)
+            raise
+        finally:
+            duration_ms = (time.time() - start_time) * 1000
+            container = getattr(request.app.state, "container", None)
+            if container and container.telemetry and container.telemetry.is_enabled:
+                status_code = response.status_code if response else 500
+                container.telemetry.track_request(
+                    name=f"{request.method} {request.url.path}",
+                    url=str(request.url),
+                    duration_ms=duration_ms,
+                    status_code=status_code,
+                    success=(status_code < 400 and error_msg is None),
+                    error=error_msg,
+                )
 
     register_error_handlers(app)
 

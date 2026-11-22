@@ -187,6 +187,17 @@ async def analyze_repository(
         outcome = EventOutcome.ACCEPTED
     run_id = f"{repo_clean}#{pr_num}#{pr_info.head_sha[:7]}"
 
+    if container.telemetry and container.telemetry.is_enabled:
+        container.telemetry.track_event(
+            "ManualAnalysisTriggered",
+            {
+                "repo": repo_clean,
+                "pr_number": str(pr_num),
+                "run_id": run_id,
+                "outcome": outcome.value,
+            },
+        )
+
     return {
         "status": outcome.value,
         "run_id": run_id,
@@ -223,6 +234,14 @@ async def listen_to_repository(
         )
     repo_clean, _ = clean_repo_name(body.repo_url)
     dispatched = await container.repo_monitor.add_repo(repo_clean)
+    if container.telemetry and container.telemetry.is_enabled:
+        container.telemetry.track_event(
+            "RepoListenStarted",
+            {
+                "repo": repo_clean,
+                "dispatched_count": str(len(dispatched)),
+            },
+        )
     return {
         "status": "listening",
         "repo": repo_clean,
