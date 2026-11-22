@@ -31,7 +31,7 @@ class DatabaseManager:
             async_url,
             echo=False,
             pool_pre_ping=True,
-            connect_args={"connect_timeout": 3},
+            connect_args={"connect_timeout": 15},
         )
         self._sessionmaker = async_sessionmaker(
             bind=self._engine,
@@ -64,7 +64,7 @@ class DatabaseManager:
             logger.warning("Error disposing database engine: %s", exc)
 
 
-def is_postgres_reachable(db_url: str, timeout: float = 1.5) -> bool:
+def is_postgres_reachable(db_url: str, timeout: float = 5.0) -> bool:
     try:
         import socket
         from urllib.parse import urlparse
@@ -93,7 +93,7 @@ def is_postgres_reachable(db_url: str, timeout: float = 1.5) -> bool:
 def build_database_manager(settings: Settings) -> DatabaseManager | None:
     db_url = settings.database_url.get_secret_value()
     if settings.checkpointer_backend == "postgres" and db_url:
-        if not is_postgres_reachable(db_url, timeout=1.5):
+        if not is_postgres_reachable(db_url, timeout=5.0):
             logger.warning("PostgreSQL host is unreachable; falling back to in-memory persistence.")
             return None
         try:

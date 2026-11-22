@@ -39,7 +39,7 @@ class CheckpointerManager:
 def build_checkpointer(settings: Settings) -> CheckpointerManager:
     db_url = settings.database_url.get_secret_value()
     if settings.checkpointer_backend == "postgres" and db_url:
-        if not is_postgres_reachable(db_url, timeout=1.5):
+        if not is_postgres_reachable(db_url, timeout=5.0):
             logger.info("PostgreSQL host unreachable; using fast in-memory checkpointing.")
             return CheckpointerManager(MemorySaver())
         try:
@@ -51,8 +51,8 @@ def build_checkpointer(settings: Settings) -> CheckpointerManager:
             pool = AsyncConnectionPool(
                 conninfo=clean_url,
                 max_size=20,
-                timeout=1.5,
-                kwargs={"autocommit": True, "row_factory": dict_row, "connect_timeout": 2},
+                timeout=30.0,
+                kwargs={"autocommit": True, "row_factory": dict_row, "connect_timeout": 15},
                 open=False,
             )
             checkpointer = AsyncPostgresSaver(pool)
