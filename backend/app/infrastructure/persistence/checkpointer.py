@@ -4,6 +4,7 @@ from typing import Any
 from langgraph.checkpoint.memory import MemorySaver
 
 from app.core.config import Settings
+from app.infrastructure.persistence.database import is_postgres_reachable
 
 logger = logging.getLogger(__name__)
 
@@ -38,27 +39,10 @@ class CheckpointerManager:
 def build_checkpointer(settings: Settings) -> CheckpointerManager:
     db_url = settings.database_url.get_secret_value()
     if settings.checkpointer_backend == "postgres" and db_url:
+        if not is_postgres_reachable(db_url, timeout=1.5):
+            logger.info("PostgreSQL host unreachable; using fast in-memory checkpointing.")
+            return CheckpointerManager(MemorySaver())
         try:
-            # Fast socket reachability check to prevent 10-minute node checkpoint hangs if DB is firewalled
-            import socket
-            from urllib.parse import urlparse
-
-            clean_proto = (
-                db_url.replace("postgresql+psycopg://", "http://")
-                .replace("postgres://", "http://")
-                .replace("postgresql://", "http://")
-            )
-            parsed = urlparse(clean_proto)
-            host = parsed.hostname
-            port = parsed.port or 5432
-            if host:
-                sock = socket.socket()
-                sock.settimeout(2.0)
-                try:
-                    sock.connect((host, port))
-                finally:
-                    sock.close()
-
             from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
             from psycopg.rows import dict_row
             from psycopg_pool import AsyncConnectionPool
@@ -75,7 +59,7 @@ def build_checkpointer(settings: Settings) -> CheckpointerManager:
             return CheckpointerManager(checkpointer, pool=pool)
         except Exception as exc:
             logger.warning(
-                "PostgreSQL checkpointer unreachable (%s); using fast in-memory checkpointing",
+                "PostgreSQL checkpointer error (%s); falling back to in-memory checkpointing",
                 exc,
             )
 

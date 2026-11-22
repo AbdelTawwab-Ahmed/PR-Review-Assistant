@@ -64,9 +64,38 @@ class DatabaseManager:
             logger.warning("Error disposing database engine: %s", exc)
 
 
+def is_postgres_reachable(db_url: str, timeout: float = 1.5) -> bool:
+    try:
+        import socket
+        from urllib.parse import urlparse
+
+        clean = (
+            db_url.replace("postgresql+psycopg://", "http://")
+            .replace("postgres://", "http://")
+            .replace("postgresql://", "http://")
+        )
+        parsed = urlparse(clean)
+        host = parsed.hostname
+        port = parsed.port or 5432
+        if not host:
+            return False
+        sock = socket.socket()
+        sock.settimeout(timeout)
+        try:
+            sock.connect((host, port))
+            return True
+        finally:
+            sock.close()
+    except Exception:
+        return False
+
+
 def build_database_manager(settings: Settings) -> DatabaseManager | None:
     db_url = settings.database_url.get_secret_value()
     if settings.checkpointer_backend == "postgres" and db_url:
+        if not is_postgres_reachable(db_url, timeout=1.5):
+            logger.warning("PostgreSQL host is unreachable; falling back to in-memory persistence.")
+            return None
         try:
             return DatabaseManager(db_url)
         except Exception as exc:
