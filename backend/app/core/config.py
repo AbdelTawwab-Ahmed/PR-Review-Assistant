@@ -39,13 +39,13 @@ class Settings(BaseSettings):
     # Azure OpenAI Configuration
     azure_openai_endpoint: str = ""
     azure_openai_api_key: SecretStr = SecretStr("")
-    azure_openai_api_version: str = "2025-04-01-preview"
+    azure_openai_api_version: str = "2024-08-01-preview"
     azure_openai_deployment_strong: str = ""
     azure_openai_deployment_fast: str = ""
 
     # LLM Configuration
     llm_timeout_seconds: float = 60.0
-    llm_max_concurrency: int = 4
+    llm_max_concurrency: int = 16
 
     # Review Configuration
     review_chunk_chars: int = 24000

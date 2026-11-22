@@ -82,22 +82,23 @@ export const LiveAnalysisTracker: React.FC<LiveAnalysisTrackerProps> = ({
       return index === 0 ? 'active' : 'pending';
     }
     if (status === 'analyzing') {
-      // Smoothly advance through the stages as the analysis progresses
-      if (elapsed < 12) {
+      // Parallel multi-threaded execution through the LangGraph agents
+      if (elapsed < 6) {
         if (index === 0) return 'completed';
         if (index === 1) return 'active';
         return 'pending';
-      } else if (elapsed < 30) {
+      } else if (elapsed < 24) {
         if (index < 2) return 'completed';
-        if (index === 2) return 'active';
+        // Both Bug Reviewer and Security agents run in parallel threads concurrently
+        if (index === 2 || index === 3) return 'active';
         return 'pending';
-      } else if (elapsed < 50) {
-        if (index < 3) return 'completed';
-        if (index === 3) return 'active';
-        return 'pending';
-      } else {
+      } else if (elapsed < 38) {
         if (index < 4) return 'completed';
         if (index === 4) return 'active';
+        return 'pending';
+      } else {
+        if (index < 5) return 'completed';
+        if (index === 5 || index === 6) return 'active';
         return 'pending';
       }
     }
@@ -127,6 +128,7 @@ export const LiveAnalysisTracker: React.FC<LiveAnalysisTrackerProps> = ({
           <div className="tracker-badge">
             <span className="pulse-indicator" />
             <span>AI Agents Actively Analyzing</span>
+            <span style={{ marginLeft: '0.5rem', padding: '0.15rem 0.5rem', background: 'rgba(56, 189, 248, 0.15)', color: '#38bdf8', borderRadius: '4px', fontSize: '0.75rem', fontWeight: 600 }}>⚡ Multi-Threaded</span>
           </div>
           <h3 className="tracker-repo-name">
             {repo} <span className="pr-highlight">#{prNumber}</span>
@@ -175,7 +177,24 @@ export const LiveAnalysisTracker: React.FC<LiveAnalysisTrackerProps> = ({
         })}
       </div>
 
-      {elapsed > 60 && !isDone && (
+      {currentRun?.status === 'failed' && (
+        <div style={{ marginTop: '1.25rem', padding: '1rem 1.25rem', background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.4)', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem' }}>
+          <div>
+            <div style={{ color: '#ef4444', fontWeight: 700, fontSize: '0.95rem', marginBottom: '0.25rem' }}>⚠️ Analysis Encountered An Issue</div>
+            <div style={{ color: '#fca5a5', fontSize: '0.825rem' }}>
+              {currentRun.notes && currentRun.notes.length > 0 ? currentRun.notes[0] : 'The background workflow encountered an error. Click retry to run fresh.'}
+            </div>
+          </div>
+          <button
+            onClick={() => window.location.reload()}
+            style={{ padding: '0.5rem 1rem', background: '#ef4444', color: '#fff', border: 'none', borderRadius: '6px', fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' }}
+          >
+            Retry Analysis
+          </button>
+        </div>
+      )}
+
+      {elapsed > 60 && !isDone && currentRun?.status !== 'failed' && (
         <div style={{ marginTop: '1.25rem', padding: '0.85rem 1.25rem', background: 'rgba(234, 179, 8, 0.08)', border: '1px solid rgba(234, 179, 8, 0.3)', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem' }}>
           <div style={{ fontSize: '0.875rem', color: '#facc15', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
             <span>⏱️</span>

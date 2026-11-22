@@ -51,7 +51,8 @@ def build_checkpointer(settings: Settings) -> CheckpointerManager:
             pool = AsyncConnectionPool(
                 conninfo=clean_url,
                 max_size=20,
-                kwargs={"autocommit": True, "row_factory": dict_row},
+                timeout=1.5,
+                kwargs={"autocommit": True, "row_factory": dict_row, "connect_timeout": 2},
                 open=False,
             )
             checkpointer = AsyncPostgresSaver(pool)

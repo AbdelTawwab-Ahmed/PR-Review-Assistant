@@ -1,4 +1,5 @@
 import asyncio
+from concurrent.futures import ThreadPoolExecutor
 import logging
 from typing import Any, TypeVar
 
@@ -24,7 +25,7 @@ class AzureOpenAILLM:
         tracker: TokenTracker,
         timeout_seconds: float = 60.0,
         max_retries: int = 2,
-        max_concurrency: int = 4,
+        max_concurrency: int = 16,
     ) -> None:
         self._endpoint = endpoint
         self._api_key = api_key
@@ -34,6 +35,10 @@ class AzureOpenAILLM:
         self._timeout = timeout_seconds
         self._max_retries = max_retries
         self._semaphore = asyncio.Semaphore(max_concurrency)
+        self._executor = ThreadPoolExecutor(
+            max_workers=max_concurrency,
+            thread_name_prefix="agent-llm-worker",
+        )
         self._models: dict[str, Any] = {}
 
     def _model(self, deployment: str) -> Any:
@@ -63,9 +68,15 @@ class AzureOpenAILLM:
         label = purpose or schema.__name__
         deployment = self._router.deployment_for(tier)
         runnable = self._model(deployment).with_structured_output(schema, include_raw=True)
+        loop = asyncio.get_running_loop()
+
+        def _execute_in_worker_thread():
+            return runnable.invoke([("system", system), ("user", user)])
+
         async with self._semaphore:
             try:
-                result = await runnable.ainvoke([("system", system), ("user", user)])
+                # Execute in multi-threaded worker pool to maximize parallelism
+                result = await loop.run_in_executor(self._executor, _execute_in_worker_thread)
             except Exception as exc:  # the SDK raises many unrelated error types
                 logger.warning("LLM call failed (%s)", label, exc_info=True)
                 raise LLMError(f"{label} call failed: {type(exc).__name__}") from exc
