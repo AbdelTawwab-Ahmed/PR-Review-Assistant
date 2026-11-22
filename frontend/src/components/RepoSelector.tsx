@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { getUserRepos, getRepoDetails, type UserRepoItem, type RepoDetailsResponse } from '../api/repos';
+import { getRepoDetails, type RepoDetailsResponse } from '../api/repos';
 
 interface RepoSelectorProps {
   onAnalyze: (repo: string, prNumber?: number) => void;
@@ -11,21 +11,9 @@ export const RepoSelector: React.FC<RepoSelectorProps> = ({ onAnalyze, isAnalyzi
   const [selectedRepo, setSelectedRepo] = useState<string>('');
   const [selectedPr, setSelectedPr] = useState<number | undefined>(undefined);
 
-  const [userRepos, setUserRepos] = useState<UserRepoItem[]>([]);
   const [repoDetails, setRepoDetails] = useState<RepoDetailsResponse | null>(null);
   const [isLoadingDetails, setIsLoadingDetails] = useState(false);
   const [validationError, setValidationError] = useState<string | null>(null);
-
-  // Load connected user repositories on mount
-  useEffect(() => {
-    getUserRepos()
-      .then((repos) => {
-        if (repos && repos.length > 0) {
-          setUserRepos(repos);
-        }
-      })
-      .catch(() => {});
-  }, []);
 
   // Fetch repository details whenever selectedRepo changes
   useEffect(() => {
@@ -104,12 +92,6 @@ export const RepoSelector: React.FC<RepoSelectorProps> = ({ onAnalyze, isAnalyzi
     }
   };
 
-  const handleSelectConnectedRepo = (repoName: string) => {
-    setInputVal(`https://github.com/${repoName}`);
-    setSelectedRepo(repoName);
-    setValidationError(null);
-  };
-
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const parsed = parseRepoString(inputVal);
@@ -183,27 +165,6 @@ export const RepoSelector: React.FC<RepoSelectorProps> = ({ onAnalyze, isAnalyzi
         <div className="repo-error-banner">
           <span className="error-icon">⚠️</span>
           <span>{validationError}</span>
-        </div>
-      )}
-
-      {/* Quick Select Connected Repositories */}
-      {userRepos.length > 0 && (
-        <div className="quick-repos-bar">
-          <span className="quick-repos-label">Connected Repositories:</span>
-          <div className="quick-repos-chips">
-            {userRepos.map((r) => (
-              <button
-                key={r.id}
-                type="button"
-                className={`quick-repo-chip ${selectedRepo === r.full_name ? 'selected' : ''}`}
-                onClick={() => handleSelectConnectedRepo(r.full_name)}
-              >
-                <span className="chip-repo-icon">📁</span>
-                <span className="chip-repo-text">{r.name}</span>
-                {r.language && <span className="chip-lang-dot">{r.language}</span>}
-              </button>
-            ))}
-          </div>
         </div>
       )}
 
