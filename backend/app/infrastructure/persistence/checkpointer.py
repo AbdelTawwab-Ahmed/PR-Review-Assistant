@@ -39,25 +39,44 @@ def build_checkpointer(settings: Settings) -> CheckpointerManager:
     db_url = settings.database_url.get_secret_value()
     if settings.checkpointer_backend == "postgres" and db_url:
         try:
+            # Fast socket reachability check to prevent 10-minute node checkpoint hangs if DB is firewalled
+            import socket
+            from urllib.parse import urlparse
+
+            clean_proto = (
+                db_url.replace("postgresql+psycopg://", "http://")
+                .replace("postgres://", "http://")
+                .replace("postgresql://", "http://")
+            )
+            parsed = urlparse(clean_proto)
+            host = parsed.hostname
+            port = parsed.port or 5432
+            if host:
+                sock = socket.socket()
+                sock.settimeout(2.0)
+                try:
+                    sock.connect((host, port))
+                finally:
+                    sock.close()
+
             from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
             from psycopg.rows import dict_row
             from psycopg_pool import AsyncConnectionPool
 
+            clean_url = db_url.replace("postgresql+psycopg://", "postgresql://")
             pool = AsyncConnectionPool(
-                conninfo=db_url,
+                conninfo=clean_url,
                 max_size=20,
                 kwargs={"autocommit": True, "row_factory": dict_row},
                 open=False,
             )
             checkpointer = AsyncPostgresSaver(pool)
+            logger.info("Using PostgreSQL checkpointer backend.")
             return CheckpointerManager(checkpointer, pool=pool)
-        except ImportError:
-            logger.warning(
-                "Postgres checkpointer packages not installed; falling back to MemorySaver"
-            )
         except Exception as exc:
             logger.warning(
-                "Failed to initialize Postgres checkpointer (%s); falling back to MemorySaver", exc
+                "PostgreSQL checkpointer unreachable (%s); using fast in-memory checkpointing",
+                exc,
             )
 
     return CheckpointerManager(MemorySaver())

@@ -31,6 +31,7 @@ class DatabaseManager:
             async_url,
             echo=False,
             pool_pre_ping=True,
+            connect_args={"connect_timeout": 3},
         )
         self._sessionmaker = async_sessionmaker(
             bind=self._engine,

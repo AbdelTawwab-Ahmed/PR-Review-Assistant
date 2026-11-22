@@ -155,8 +155,10 @@ def _model_to_entity(m: ReviewRunModel) -> ReviewRun:
 class PostgresReviewRunRepository:
     def __init__(self, db: DatabaseManager) -> None:
         self._db = db
+        self._mem = InMemoryReviewRunRepository()
 
     async def save(self, run: ReviewRun) -> None:
+        await self._mem.save(run)
         try:
             async with self._db.session() as session:
                 model = ReviewRunModel(
@@ -186,9 +188,11 @@ class PostgresReviewRunRepository:
                 stmt = select(ReviewRunModel).where(ReviewRunModel.id == run_id)
                 result = await session.execute(stmt)
                 model = result.scalar_one_or_none()
-                return _model_to_entity(model) if model else None
+                if model:
+                    return _model_to_entity(model)
         except Exception:
-            return None
+            pass
+        return await self._mem.get_by_id(run_id)
 
     async def list_by_repo(
         self,
@@ -207,9 +211,12 @@ class PostgresReviewRunRepository:
                     .offset(offset)
                 )
                 result = await session.execute(stmt)
-                return [_model_to_entity(m) for m in result.scalars().all()]
+                db_runs = [_model_to_entity(m) for m in result.scalars().all()]
+                if db_runs:
+                    return db_runs
         except Exception:
-            return []
+            pass
+        return await self._mem.list_by_repo(repo_full_name, limit=limit, offset=offset)
 
     async def list_by_pr(
         self,
@@ -230,9 +237,12 @@ class PostgresReviewRunRepository:
                     .limit(limit)
                 )
                 result = await session.execute(stmt)
-                return [_model_to_entity(m) for m in result.scalars().all()]
+                db_runs = [_model_to_entity(m) for m in result.scalars().all()]
+                if db_runs:
+                    return db_runs
         except Exception:
-            return []
+            pass
+        return await self._mem.list_by_pr(repo_full_name, pr_number, limit=limit)
 
     async def list_all(
         self,
@@ -249,9 +259,12 @@ class PostgresReviewRunRepository:
                     .offset(offset)
                 )
                 result = await session.execute(stmt)
-                return [_model_to_entity(m) for m in result.scalars().all()]
+                db_runs = [_model_to_entity(m) for m in result.scalars().all()]
+                if db_runs:
+                    return db_runs
         except Exception:
-            return []
+            pass
+        return await self._mem.list_all(limit=limit, offset=offset)
 
 
 class InMemoryReviewRunRepository:
