@@ -184,7 +184,7 @@ export const HistoryPage: React.FC = () => {
                 <tr key={run.id} className="table-row">
                   <td>
                     <div className="repo-cell">
-                      <Link to={`/runs/${run.id}`} className="repo-link">
+                      <Link to={`/runs/${encodeURIComponent(run.id)}`} className="repo-link">
                         <span className="repo-owner">{run.repo_full_name.split('/')[0]}</span>
                         <span className="repo-slash">/</span>
                         <span className="repo-name-bold">{run.repo_full_name.split('/')[1] || run.repo_full_name}</span>
@@ -216,7 +216,7 @@ export const HistoryPage: React.FC = () => {
                     <code className="commit-chip">{run.head_sha.slice(0, 7)}</code>
                   </td>
                   <td className="text-right">
-                    <Link to={`/runs/${run.id}`} className="btn btn-secondary btn-sm">
+                    <Link to={`/runs/${encodeURIComponent(run.id)}`} className="btn btn-secondary btn-sm">
                       Inspect
                     </Link>
                   </td>

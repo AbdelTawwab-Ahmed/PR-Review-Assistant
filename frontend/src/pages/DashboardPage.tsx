@@ -108,7 +108,7 @@ export const DashboardPage: React.FC = () => {
                 Review Results: {completedRun.repo_full_name} #{completedRun.pr_number}
               </h3>
             </div>
-            <Link to={`/runs/${completedRun.run_id}`} className="btn btn-primary btn-sm">
+            <Link to={`/runs/${encodeURIComponent(completedRun.run_id)}`} className="btn btn-primary btn-sm">
               Open Full Review Workspace &rarr;
             </Link>
           </div>
@@ -191,7 +191,7 @@ export const DashboardPage: React.FC = () => {
                   <tr key={r.id} className="table-row">
                     <td>
                       <div className="repo-cell">
-                        <Link to={`/runs/${r.id}`} className="repo-link">
+                        <Link to={`/runs/${encodeURIComponent(r.id)}`} className="repo-link">
                           <span className="repo-owner">{r.repo_full_name.split('/')[0]}</span>
                           <span className="repo-slash">/</span>
                           <span className="repo-name-bold">{r.repo_full_name.split('/')[1] || r.repo_full_name}</span>
@@ -220,7 +220,7 @@ export const DashboardPage: React.FC = () => {
                       <code className="commit-chip">{r.head_sha.slice(0, 7)}</code>
                     </td>
                     <td className="text-right">
-                      <Link to={`/runs/${r.id}`} className="btn btn-secondary btn-sm">
+                      <Link to={`/runs/${encodeURIComponent(r.id)}`} className="btn btn-secondary btn-sm">
                         Inspect
                       </Link>
                     </td>

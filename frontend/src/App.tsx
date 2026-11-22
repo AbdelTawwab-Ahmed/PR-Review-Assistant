@@ -20,6 +20,7 @@ export default function App() {
             <Route path="/history" element={<HistoryPage />} />
             <Route path="/settings" element={<SettingsPage />} />
             <Route path="/runs/:runId" element={<RunDetailPage />} />
+            <Route path="/runs/*" element={<RunDetailPage />} />
           </Routes>
         </main>
       </div>

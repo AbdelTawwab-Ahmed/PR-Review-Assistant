@@ -84,6 +84,13 @@ class AsyncioRunDispatcher:
             await self._repository.save(run)
             logger.info("Run %s completed with status: %s", run_id, run.status)
 
+            risk_level = (
+                getattr(result.risk.level, "value", str(result.risk.level))
+                if result.risk
+                else "UNKNOWN"
+            )
+            risk_score = result.risk.score if result.risk else 0
+
             if self._telemetry and getattr(self._telemetry, "is_enabled", False):
                 self._telemetry.track_event(
                     "ReviewRunCompleted",
@@ -99,12 +106,6 @@ class AsyncioRunDispatcher:
                 )
 
             # Post formatted markdown review comment on the PR
-            risk_level = (
-                getattr(result.risk.level, "value", str(result.risk.level))
-                if result.risk
-                else "UNKNOWN"
-            )
-            risk_score = result.risk.score if result.risk else 0
 
             comment_body = [
                 "## 🤖 PR Review Assistant Analysis",

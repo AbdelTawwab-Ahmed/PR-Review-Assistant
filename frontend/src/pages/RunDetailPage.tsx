@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, useLocation, Link } from 'react-router-dom';
 import { useRun, useApproveRun } from '../hooks/useRuns';
 import { StatusBadge } from '../components/StatusBadge';
 import { RiskGauge } from '../components/RiskGauge';
@@ -10,7 +10,14 @@ import { AgentPipeline } from '../components/AgentPipeline';
 import type { ApprovalDecision, RunStatus } from '../types/run';
 
 export const RunDetailPage: React.FC = () => {
-  const { runId } = useParams<{ runId: string }>();
+  const params = useParams<{ runId?: string; '*': string }>();
+  const location = useLocation();
+
+  // Extract runId reliably even if it contains slashes (/), hashes (#), or encoded chars
+  const rawId = params['*'] || params.runId || location.pathname.replace(/^\/runs\/?/, '');
+  const fullRaw = rawId + (location.hash || '');
+  const runId = decodeURIComponent(fullRaw);
+
   const { data: run, isLoading, error, refetch, isFetching } = useRun(runId);
   const approveMutation = useApproveRun(runId || '');
 
@@ -122,15 +129,15 @@ export const RunDetailPage: React.FC = () => {
 
             <div className="meta-chip clickable-chip" onClick={copySha} title="Click to copy commit SHA">
               <span className="meta-chip-label">Commit</span>
-              <code className="meta-chip-value">{run.head_sha.slice(0, 8)}</code>
+              <code className="meta-chip-value">{(run.head_sha || '').slice(0, 8) || 'HEAD'}</code>
               <span className="copy-label">{copiedSha ? 'Copied!' : 'Copy'}</span>
             </div>
 
-            {run.risk && (
+            {run.risk && run.risk.level && (
               <div className="meta-chip">
                 <span className="meta-chip-label">Risk Level</span>
-                <span className={`risk-pill-text level-${run.risk.level.toLowerCase()}`}>
-                  {run.risk.level.toUpperCase()} ({run.risk.score}/100)
+                <span className={`risk-pill-text level-${String(run.risk.level).toLowerCase()}`}>
+                  {String(run.risk.level).toUpperCase()} ({run.risk.score ?? 0}/100)
                 </span>
               </div>
             )}
