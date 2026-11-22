@@ -232,8 +232,8 @@ export const RepoSelector: React.FC<RepoSelectorProps> = ({ onAnalyze, isAnalyzi
               </div>
             </div>
           ) : (
-            <div className="no-open-prs-note">
-              <span>ℹ️ No open pull requests found. Analysis will examine recent changes on the default branch <code>{repoDetails.repo.default_branch}</code>.</span>
+            <div className="no-open-prs-note" style={{ background: 'rgba(234, 179, 8, 0.1)', border: '1px solid rgba(234, 179, 8, 0.3)', padding: '0.75rem 1rem', borderRadius: '8px', color: '#facc15', fontSize: '0.85rem' }}>
+              <span>⚠️ No pull requests found on this repository. This assistant analyzes <strong>Pull Requests</strong>. Please open a PR or enter a repository that has PRs (e.g. <code>https://github.com/AbdelTawwab-Ahmed/PR-Review-Assistant/pull/19</code>).</span>
             </div>
           )}
         </div>
