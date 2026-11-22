@@ -53,12 +53,8 @@ def make_hitl_plan_approval():
             "Pausing at Stage 1 HITL: Initial Remediation Authorization for %s",
             state.get("repo_full_name"),
         )
-        try:
-            decision_data = interrupt(interrupt_payload)
-            logger.info("Stage 1 HITL resumed with decision: %s", decision_data)
-        except Exception as exc:
-            logger.info("Interrupt skipped (no checkpointer or direct execution): %s", exc)
-            decision_data = {"decision": "approve", "feedback": ""}
+        decision_data = interrupt(interrupt_payload)
+        logger.info("Stage 1 HITL resumed with decision: %s", decision_data)
 
         if isinstance(decision_data, str):
             decision = ApprovalDecision(decision_data)

@@ -36,12 +36,8 @@ def make_hitl_approval():
         }
 
         # interrupt pauses execution until resumed via Command(resume=...)
-        try:
-            decision_data = interrupt(interrupt_payload)
-            logger.info("HITL approval resumed with decision data: %s", decision_data)
-        except Exception as exc:
-            logger.info("Interrupt skipped (no checkpointer or direct execution): %s", exc)
-            decision_data = {"decision": "approve", "feedback": ""}
+        decision_data = interrupt(interrupt_payload)
+        logger.info("HITL approval resumed with decision data: %s", decision_data)
 
         if isinstance(decision_data, str):
             decision = ApprovalDecision(decision_data)
