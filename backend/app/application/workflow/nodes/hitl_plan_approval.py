@@ -10,7 +10,8 @@ logger = logging.getLogger(__name__)
 
 
 def make_hitl_plan_approval():
-    """Stage 1 Human-in-the-Loop Gate: Requires explicit human authorization before any remediation agents touch code."""
+    """Stage 1 Human-in-the-Loop Gate: Requires human approval before remediation agents run."""
+
     async def hitl_plan_approval(state: ReviewState) -> dict[str, Any]:
         findings = state.get("final_findings", [])
         risk = state.get("risk")
@@ -24,8 +25,12 @@ def make_hitl_plan_approval():
             "findings": [
                 {
                     "id": f.id,
-                    "category": f.category.value if hasattr(f.category, "value") else str(f.category),
-                    "severity": f.severity.value if hasattr(f.severity, "value") else str(f.severity),
+                    "category": f.category.value
+                    if hasattr(f.category, "value")
+                    else str(f.category),
+                    "severity": f.severity.value
+                    if hasattr(f.severity, "value")
+                    else str(f.severity),
                     "title": f.title,
                     "description": f.description,
                     "file_path": f.file_path,
@@ -37,11 +42,17 @@ def make_hitl_plan_approval():
             ],
             "risk_score": risk.score if risk else 0,
             "risk_level": risk.level.value if risk and hasattr(risk.level, "value") else "low",
-            "proposed_remediation_summary": f"Identified {len(findings)} issue(s) across codebase. Awaiting human approval to initialize remediation agents.",
+            "proposed_remediation_summary": (
+                f"Identified {len(findings)} issue(s) across codebase. "
+                "Awaiting human approval to initialize remediation agents."
+            ),
         }
 
         # Pauses workflow until resumed by human reviewer
-        logger.info("Pausing at Stage 1 HITL: Initial Remediation Authorization for %s", state.get("repo_full_name"))
+        logger.info(
+            "Pausing at Stage 1 HITL: Initial Remediation Authorization for %s",
+            state.get("repo_full_name"),
+        )
         try:
             decision_data = interrupt(interrupt_payload)
             logger.info("Stage 1 HITL resumed with decision: %s", decision_data)

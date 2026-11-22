@@ -38,7 +38,13 @@ class GetRunStatus:
         interrupts = [i.value for t in state_snapshot.tasks for i in t.interrupts]
         interrupt_payload = interrupts[0] if interrupts else None
 
-        if interrupt_payload or (state_snapshot.next and ("hitl_approval" in state_snapshot.next or "hitl_plan_approval" in state_snapshot.next)):
+        if interrupt_payload or (
+            state_snapshot.next
+            and (
+                "hitl_approval" in state_snapshot.next
+                or "hitl_plan_approval" in state_snapshot.next
+            )
+        ):
             if interrupt_payload and interrupt_payload.get("status") == "awaiting_plan_approval":
                 status = RunStatus.AWAITING_PLAN_APPROVAL
             elif state_snapshot.next and "hitl_plan_approval" in state_snapshot.next:
@@ -47,7 +53,10 @@ class GetRunStatus:
                 status = RunStatus.AWAITING_APPROVAL
         elif values.get("published_pr_url"):
             status = RunStatus.READY_TO_MERGE
-        elif values.get("approval_decision") == ApprovalDecision.REJECT or values.get("plan_approval_decision") == ApprovalDecision.REJECT:
+        elif (
+            values.get("approval_decision") == ApprovalDecision.REJECT
+            or values.get("plan_approval_decision") == ApprovalDecision.REJECT
+        ):
             status = RunStatus.REJECTED
         elif values.get("proposal"):
             status = RunStatus.VALIDATING

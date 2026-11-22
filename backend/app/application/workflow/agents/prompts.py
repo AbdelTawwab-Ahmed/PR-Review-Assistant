@@ -13,17 +13,22 @@ Perform a comprehensive, high-standard code quality, architecture, and reliabili
 Rules:
 - Inspect the code for:
   1. Bugs, logic errors, incorrect conditionals, and unhandled edge cases (category "bug").
-  2. Performance issues, unnecessary allocations, slow queries, and algorithmic traps (category "performance").
-  3. Dependency issues, vulnerable or deprecated packages, and supply chain risks (category "dependency").
-  4. Logging issues, sensitive data leaks, and broken or swallowed error handling (category "logging").
-  5. Architecture, design patterns, separation of concerns, and modularity violations (category "architecture").
+  2. Performance issues, unnecessary allocations, slow queries, and algorithmic traps
+     (category "performance").
+  3. Dependency issues, vulnerable or deprecated packages, and supply chain risks
+     (category "dependency").
+  4. Logging issues, sensitive data leaks, and broken or swallowed error handling
+     (category "logging").
+  5. Architecture, design patterns, separation of concerns, and modularity violations
+     (category "architecture").
   6. Code smells, anti-patterns, and maintainability concerns (category "code_smell").
 - Skip trivial cosmetic whitespace or formatting issues caught by basic formatters.
 - Prefer high-confidence, actionable findings with clear explanations.
 - file_path must be copied exactly from a <file> tag. line_start and line_end are line
   numbers from the left column (new file); use null when no single line applies.
-- severity: critical = crash, security breach, data loss in normal use; high = defect on common path;
-  medium = edge case or noticeable risk; low = hardening; info = advisory.
+- severity: critical = crash, security breach, data loss in normal use;
+  high = defect on common path; medium = edge case or noticeable risk;
+  low = hardening; info = advisory.
 - suggestion: a short, concrete recommendation or fix, or null.
 """
 

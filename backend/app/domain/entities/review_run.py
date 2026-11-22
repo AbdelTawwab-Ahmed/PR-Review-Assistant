@@ -80,7 +80,9 @@ class ReviewRun:
             raise InvalidApprovalError("Run is not awaiting approval")
         self.approval = decision
         if self.status is RunStatus.AWAITING_PLAN_APPROVAL:
-            target = RunStatus.PLANNING if decision is ApprovalDecision.APPROVE else RunStatus.REJECTED
+            target = (
+                RunStatus.PLANNING if decision is ApprovalDecision.APPROVE else RunStatus.REJECTED
+            )
         else:
             target = _APPROVAL_TARGETS[decision]
         self.transition_to(target)

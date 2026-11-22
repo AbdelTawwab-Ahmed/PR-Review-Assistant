@@ -20,32 +20,37 @@ export const RepoSelector: React.FC<RepoSelectorProps> = ({ onAnalyze, isAnalyzi
     if (!selectedRepo || !selectedRepo.includes('/')) return;
 
     let isMounted = true;
-    setIsLoadingDetails(true);
-    setValidationError(null);
+    const timer = setTimeout(() => {
+      if (!isMounted) return;
+      setIsLoadingDetails(true);
+      setValidationError(null);
 
-    getRepoDetails(selectedRepo)
-      .then((data) => {
-        if (!isMounted) return;
-        setRepoDetails(data);
-        if (data.url_pr_number) {
-          setSelectedPr(data.url_pr_number);
-        } else if (data.open_prs && data.open_prs.length > 0) {
-          setSelectedPr(data.open_prs[0].number);
-        } else {
-          setSelectedPr(undefined);
-        }
-      })
-      .catch((err) => {
-        if (!isMounted) return;
-        setValidationError(err?.message || 'Could not fetch repository information.');
-        setRepoDetails(null);
-      })
-      .finally(() => {
-        if (isMounted) setIsLoadingDetails(false);
-      });
+      getRepoDetails(selectedRepo)
+        .then((data) => {
+          if (!isMounted) return;
+          setRepoDetails(data);
+          if (data.url_pr_number) {
+            setSelectedPr(data.url_pr_number);
+          } else if (data.open_prs && data.open_prs.length > 0) {
+            setSelectedPr(data.open_prs[0].number);
+          } else {
+            setSelectedPr(undefined);
+          }
+        })
+        .catch((err: unknown) => {
+          if (!isMounted) return;
+          const message = err instanceof Error ? err.message : 'Could not fetch repository information.';
+          setValidationError(message);
+          setRepoDetails(null);
+        })
+        .finally(() => {
+          if (isMounted) setIsLoadingDetails(false);
+        });
+    }, 0);
 
     return () => {
       isMounted = false;
+      clearTimeout(timer);
     };
   }, [selectedRepo]);
 

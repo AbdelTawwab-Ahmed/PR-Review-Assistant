@@ -26,8 +26,9 @@ export const RepositoriesPage: React.FC = () => {
       setInputUrl('');
       const updated = await getListeningRepos();
       setMonitoredRepos(updated.repositories);
-    } catch (err: any) {
-      setMsg({ type: 'error', text: err?.message || 'Failed to start listening to repo.' });
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Failed to start listening to repo.';
+      setMsg({ type: 'error', text: message });
     } finally {
       setIsLoading(false);
     }

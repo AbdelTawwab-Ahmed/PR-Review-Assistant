@@ -47,8 +47,12 @@ export const DashboardPage: React.FC = () => {
         repo: res.repo,
         prNumber: res.pr_number,
       });
-    } catch (err: any) {
-      setAnalysisError(err?.message || 'Failed to trigger repository analysis. Check repository accessibility.');
+    } catch (err: unknown) {
+      const message =
+        err instanceof Error
+          ? err.message
+          : 'Failed to trigger repository analysis. Check repository accessibility.';
+      setAnalysisError(message);
       setIsAnalyzing(false);
       setActiveAnalysis(null);
     }

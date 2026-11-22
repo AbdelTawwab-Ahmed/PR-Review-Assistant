@@ -22,7 +22,10 @@ export const RunDetailPage: React.FC = () => {
   const { data: run, isLoading, error, refetch, isFetching } = useRun(runId);
   const approveMutation = useApproveRun(runId || '');
 
-  const [activeTab, setActiveTab] = useState<'proposal' | 'findings' | 'risk' | 'notes'>('proposal');
+  const [userSelectedTab, setUserSelectedTab] = useState<'proposal' | 'findings' | 'risk' | 'notes' | null>(null);
+  const activeTab = userSelectedTab ?? (run?.status === 'awaiting_plan_approval' ? 'findings' : 'proposal');
+  const setActiveTab = setUserSelectedTab;
+
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalStage, setModalStage] = useState<'plan' | 'final'>('final');
   const [actionError, setActionError] = useState<string | null>(null);
@@ -42,12 +45,6 @@ export const RunDetailPage: React.FC = () => {
       setIsRerunning(false);
     }
   };
-
-  React.useEffect(() => {
-    if (run?.status === 'awaiting_plan_approval') {
-      setActiveTab('findings');
-    }
-  }, [run?.status]);
 
   const handleApprovalSubmit = async (decision: ApprovalDecision, feedback: string) => {
     setActionError(null);

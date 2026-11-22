@@ -26,7 +26,11 @@ def defuse_mentions(text: str) -> str:
 
 def build_pr_body(pr: PullRequest, proposal: FixProposal) -> str:
     notes = "\n".join(f"- {note}" for note in proposal.notes) or "- none"
-    header = f"Automated fixes proposed for #{pr.number}" if pr.number else f"Automated repository remediation"
+    header = (
+        f"Automated fixes proposed for #{pr.number}"
+        if pr.number
+        else "Automated repository remediation"
+    )
     body = (
         f"{header} by PR-Review-Assistant.\n\n"
         f"Merge this pull request into `{pr.head_branch}` to apply the fixes, "

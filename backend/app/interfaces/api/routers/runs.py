@@ -1,7 +1,8 @@
-from dataclasses import asdict
+import asyncio
 import logging
-from typing import Annotated, Any
 import uuid
+from dataclasses import asdict
+from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, status
 from fastapi.encoders import jsonable_encoder
@@ -11,6 +12,7 @@ from app.application.events import PullRequestEvent
 from app.application.use_cases.handle_pr_event import EventOutcome
 from app.core.container import Container
 from app.core.errors import NotFoundError
+from app.domain.enums import RunStatus
 from app.domain.exceptions import RunNotFoundError
 from app.infrastructure.persistence.repositories import (
     _finding_to_dict,
@@ -116,10 +118,20 @@ async def get_run(
                     "pr_number": run.pr_number,
                     "head_sha": run.head_sha,
                     "findings_count": len(run.findings),
-                    "findings": [_finding_to_dict(f) if hasattr(f, "category") else f for f in run.findings],
+                    "findings": [
+                        _finding_to_dict(f) if hasattr(f, "category") else f for f in run.findings
+                    ],
                     "risk": _risk_to_dict(run.risk) if hasattr(run.risk, "level") else run.risk,
-                    "proposal": _fix_plan_to_dict(run.fix_plan) if hasattr(run.fix_plan, "actions") else run.fix_plan,
-                    "approval_decision": run.approval.value if run.approval and hasattr(run.approval, "value") else None,
+                    "proposal": (
+                        _fix_plan_to_dict(run.fix_plan)
+                        if hasattr(run.fix_plan, "actions")
+                        else run.fix_plan
+                    ),
+                    "approval_decision": (
+                        run.approval.value
+                        if run.approval and hasattr(run.approval, "value")
+                        else None
+                    ),
                     "published_branch": None,
                     "published_pr_url": None,
                     "notes": tuple(run.failure_history or ()),
@@ -137,11 +149,13 @@ async def get_run(
             if "findings" not in result_dict or not result_dict["findings"]:
                 run = await repository.get_by_id(run_id)
                 if run and run.findings:
-                    result_dict["findings"] = [_finding_to_dict(f) if hasattr(f, "category") else f for f in run.findings]
-        except Exception:
-            pass
+                    result_dict["findings"] = [
+                        _finding_to_dict(f) if hasattr(f, "category") else f for f in run.findings
+                    ]
+        except Exception as exc:
+            logger.debug("Failed populating run findings fallback: %s", exc)
         return result_dict
-    except (RunNotFoundError, TimeoutError, asyncio.TimeoutError):
+    except (RunNotFoundError, TimeoutError):
         pass
     except Exception as exc:
         logger.warning("Error fetching run status from graph for %s: %s", run_id, exc)
@@ -158,10 +172,16 @@ async def get_run(
                     "pr_number": run.pr_number,
                     "head_sha": run.head_sha,
                     "findings_count": len(run.findings),
-                    "findings": [_finding_to_dict(f) if hasattr(f, "category") else f for f in run.findings],
+                    "findings": [
+                        _finding_to_dict(f) if hasattr(f, "category") else f for f in run.findings
+                    ],
                     "risk": _risk_to_dict(run.risk) if hasattr(run.risk, "level") else run.risk,
-                    "proposal": _fix_plan_to_dict(run.fix_plan) if hasattr(run.fix_plan, "actions") else run.fix_plan,
-                    "approval_decision": run.approval.value if run.approval and hasattr(run.approval, "value") else None,
+                    "proposal": _fix_plan_to_dict(run.fix_plan)
+                    if hasattr(run.fix_plan, "actions")
+                    else run.fix_plan,
+                    "approval_decision": run.approval.value
+                    if run.approval and hasattr(run.approval, "value")
+                    else None,
                     "published_branch": None,
                     "published_pr_url": None,
                     "notes": tuple(run.failure_history or ()),

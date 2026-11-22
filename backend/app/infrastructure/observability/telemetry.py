@@ -5,16 +5,16 @@ for Requests, Events, Exceptions, and Traces, and integrates standard Python
 logging with Azure Application Insights.
 """
 
-from collections.abc import Iterator
-from contextlib import contextmanager
 import datetime
 import json
 import logging
 import queue
 import threading
 import time
-from typing import Any
 import urllib.request
+from collections.abc import Iterator
+from contextlib import contextmanager
+from typing import Any
 
 from opentelemetry import trace
 from opentelemetry.sdk.resources import Resource
@@ -70,7 +70,7 @@ class AppInsightsSender:
         if self._stop_event.is_set():
             return
         item["iKey"] = self._ikey
-        item["time"] = datetime.datetime.now(datetime.timezone.utc).isoformat()
+        item["time"] = datetime.datetime.now(datetime.UTC).isoformat()
         try:
             self._queue.put_nowait(item)
         except queue.Full:
@@ -100,12 +100,12 @@ class AppInsightsSender:
     def _send_batch(self, batch: list[dict[str, Any]]) -> None:
         try:
             data = json.dumps(batch).encode("utf-8")
-            req = urllib.request.Request(
+            req = urllib.request.Request(  # noqa: S310
                 self._track_url,
                 headers={"Content-Type": "application/json"},
                 data=data,
             )
-            with urllib.request.urlopen(req, timeout=5) as resp:
+            with urllib.request.urlopen(req, timeout=5) as resp:  # noqa: S310 # nosec B310
                 if resp.status != 200:
                     logger.debug("App Insights non-200: %s", resp.status)
         except Exception as exc:
@@ -198,7 +198,9 @@ class TelemetryManager:
                 trace.set_tracer_provider(provider)
                 self._tracer_provider = provider
                 self._tracer = provider.get_tracer(self._service_name)
-                logger.info("Azure Application Insights telemetry active for %s", self._service_name)
+                logger.info(
+                    "Azure Application Insights telemetry active for %s", self._service_name
+                )
             except Exception as exc:
                 logger.warning("Azure App Insights exporter setup note: %s", exc)
                 self._tracer = trace.get_tracer(self._service_name)
@@ -237,7 +239,7 @@ class TelemetryManager:
                     "baseType": "RequestData",
                     "baseData": {
                         "ver": 2,
-                        "id": f"req-{int(time.time()*1000)}",
+                        "id": f"req-{int(time.time() * 1000)}",
                         "name": name,
                         "duration": format_duration(duration_ms),
                         "responseCode": str(status_code),

@@ -86,10 +86,14 @@ export const RunsPage: React.FC = () => {
       });
       setTriggerUrl('');
       setTimeout(() => refetch(), 1000);
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const message =
+        err instanceof Error
+          ? err.message
+          : 'Failed to trigger PR review. Ensure repository is accessible.';
       setTriggerMsg({
         type: 'error',
-        text: err?.message || 'Failed to trigger PR review. Ensure repository is accessible.',
+        text: message,
       });
     } finally {
       setIsTriggering(false);
@@ -112,10 +116,12 @@ export const RunsPage: React.FC = () => {
       const updated = await getListeningRepos();
       setMonitoredRepos(updated.repositories);
       refetch();
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const message =
+        err instanceof Error ? err.message : 'Failed to listen to repository.';
       setListenMsg({
         type: 'error',
-        text: err?.message || 'Failed to listen to repository.',
+        text: message,
       });
     } finally {
       setIsListeningLoading(false);

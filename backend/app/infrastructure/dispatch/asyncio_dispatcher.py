@@ -1,7 +1,8 @@
 import asyncio
-from datetime import UTC, datetime
 import logging
 import time
+from datetime import UTC, datetime
+from typing import Any
 
 from app.application.events import PullRequestEvent
 from app.application.ports.github_port import GitHubPort
@@ -9,7 +10,6 @@ from app.application.ports.repositories import ReviewRunRepository
 from app.application.use_cases.analyze_pull_request import AnalyzePullRequest
 from app.domain.entities.review_run import ReviewRun
 from app.domain.enums import RunStatus
-from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -185,5 +185,5 @@ class AsyncioRunDispatcher:
             run.updated_at = datetime.now(UTC)
             try:
                 await self._repository.save(run)
-            except Exception:
-                pass
+            except Exception as save_exc:
+                logger.debug("Failed to persist failed run status: %s", save_exc)

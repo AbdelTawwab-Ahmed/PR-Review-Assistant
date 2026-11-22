@@ -1,5 +1,7 @@
+import logging
 import uuid
 from typing import Annotated, Any
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
 
@@ -7,6 +9,8 @@ from app.application.events import PullRequestEvent
 from app.application.use_cases.handle_pr_event import EventOutcome
 from app.core.container import Container
 from app.interfaces.api.deps import get_container
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/repos", tags=["repos"])
 
@@ -157,11 +161,13 @@ async def analyze_repository(
             pr_num = open_prs[0]["number"]
         else:
             try:
-                all_prs = await container.github._get_json(f"/repos/{repo_clean}/pulls?state=all&per_page=5")
+                all_prs = await container.github._get_json(
+                    f"/repos/{repo_clean}/pulls?state=all&per_page=5"
+                )
                 if all_prs:
                     pr_num = all_prs[0]["number"]
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.debug("Failed querying past PRs for %s: %s", repo_clean, exc)
             if pr_num is None:
                 pr_num = 0  # Trigger comprehensive repository-level analysis
 
@@ -243,7 +249,10 @@ async def listen_to_repository(
         "status": "listening",
         "repo": repo_clean,
         "dispatched_prs": dispatched,
-        "message": f"Listening for any new or updated PRs on {repo_clean}. Immediately checked and queued {len(dispatched)} PR(s).",
+        "message": (
+            f"Listening for any new or updated PRs on {repo_clean}. "
+            f"Immediately checked and queued {len(dispatched)} PR(s)."
+        ),
     }
 
 

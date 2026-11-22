@@ -1,3 +1,4 @@
+import logging
 from collections.abc import Sequence
 from typing import Any
 
@@ -12,6 +13,8 @@ from app.domain.entities.risk_report import RiskFactor, RiskReport
 from app.domain.enums import ApprovalDecision, FindingCategory, RiskLevel, RunStatus, Severity
 from app.infrastructure.persistence.database import DatabaseManager
 from app.infrastructure.persistence.models import ReviewRunModel
+
+logger = logging.getLogger(__name__)
 
 
 def _finding_to_dict(f: Finding) -> dict[str, Any]:
@@ -104,13 +107,19 @@ def review_run_to_dict(r: ReviewRun) -> dict[str, Any]:
         "status": r.status.value if hasattr(r.status, "value") else str(r.status),
         "retry_count": r.retry_count,
         "max_retries": r.max_retries,
-        "approval": r.approval.value if r.approval and hasattr(r.approval, "value") else (r.approval if r.approval else None),
+        "approval": r.approval.value
+        if r.approval and hasattr(r.approval, "value")
+        else (r.approval if r.approval else None),
         "findings": [_finding_to_dict(f) if hasattr(f, "category") else f for f in r.findings],
         "risk": _risk_to_dict(r.risk) if hasattr(r.risk, "level") else r.risk,
         "fix_plan": _fix_plan_to_dict(r.fix_plan) if hasattr(r.fix_plan, "actions") else r.fix_plan,
         "failure_history": list(r.failure_history or []),
-        "created_at": r.created_at.isoformat() if hasattr(r.created_at, "isoformat") else str(r.created_at),
-        "updated_at": r.updated_at.isoformat() if hasattr(r.updated_at, "isoformat") else str(r.updated_at),
+        "created_at": r.created_at.isoformat()
+        if hasattr(r.created_at, "isoformat")
+        else str(r.created_at),
+        "updated_at": r.updated_at.isoformat()
+        if hasattr(r.updated_at, "isoformat")
+        else str(r.updated_at),
     }
 
 
@@ -121,11 +130,11 @@ def _model_to_entity(m: ReviewRunModel) -> ReviewRun:
         status_val = RunStatus.PENDING
 
     findings = []
-    for f in (m.findings_data or []):
+    for f in m.findings_data or []:
         try:
             findings.append(_dict_to_finding(f))
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug("Skipping invalid finding: %s", exc)
 
     approval_val = None
     if m.approval:
@@ -179,8 +188,8 @@ class PostgresReviewRunRepository:
                 )
                 await session.merge(model)
                 await session.commit()
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug("Database save fallback: %s", exc)
 
     async def get_by_id(self, run_id: str) -> ReviewRun | None:
         try:
@@ -190,8 +199,8 @@ class PostgresReviewRunRepository:
                 model = result.scalar_one_or_none()
                 if model:
                     return _model_to_entity(model)
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug("Database get_by_id fallback: %s", exc)
         return await self._mem.get_by_id(run_id)
 
     async def list_by_repo(
@@ -214,8 +223,8 @@ class PostgresReviewRunRepository:
                 db_runs = [_model_to_entity(m) for m in result.scalars().all()]
                 if db_runs:
                     return db_runs
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug("Database list_by_repo fallback: %s", exc)
         return await self._mem.list_by_repo(repo_full_name, limit=limit, offset=offset)
 
     async def list_by_pr(
@@ -240,8 +249,8 @@ class PostgresReviewRunRepository:
                 db_runs = [_model_to_entity(m) for m in result.scalars().all()]
                 if db_runs:
                     return db_runs
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug("Database list_by_pr fallback: %s", exc)
         return await self._mem.list_by_pr(repo_full_name, pr_number, limit=limit)
 
     async def list_all(
@@ -262,8 +271,8 @@ class PostgresReviewRunRepository:
                 db_runs = [_model_to_entity(m) for m in result.scalars().all()]
                 if db_runs:
                     return db_runs
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug("Database list_all fallback: %s", exc)
         return await self._mem.list_all(limit=limit, offset=offset)
 
 

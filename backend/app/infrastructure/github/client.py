@@ -1,3 +1,4 @@
+import base64
 import logging
 from collections.abc import Sequence
 from dataclasses import asdict
@@ -85,8 +86,7 @@ class GitHubClient:
         )
 
     async def get_repository_as_pr(self, repo_full_name: str) -> PullRequest:
-        """Construct a virtual PullRequest representing full repository contents on the default branch."""
-        import base64
+        """Construct a virtual PullRequest representing full repository contents."""
         repo_info = await self._get_json(f"/repos/{repo_full_name}")
         default_branch = repo_info.get("default_branch", "main")
         commit_info = await self._get_json(f"/repos/{repo_full_name}/commits/{default_branch}")
@@ -94,23 +94,58 @@ class GitHubClient:
 
         changed_files: list[ChangedFile] = []
         try:
-            tree_data = await self._get_json(f"/repos/{repo_full_name}/git/trees/{head_sha}?recursive=1")
+            tree_data = await self._get_json(
+                f"/repos/{repo_full_name}/git/trees/{head_sha}?recursive=1"
+            )
             blobs = [
-                item for item in tree_data.get("tree", [])
+                item
+                for item in tree_data.get("tree", [])
                 if item.get("type") == "blob"
-                and any(item.get("path", "").endswith(ext) for ext in (".py", ".ts", ".tsx", ".js", ".jsx", ".json", ".yaml", ".yml", ".toml", ".md", ".sh"))
-                and not any(skip in item.get("path", "") for skip in ("node_modules", ".venv", "dist", "build", "lock"))
+                and any(
+                    item.get("path", "").endswith(ext)
+                    for ext in (
+                        ".py",
+                        ".ts",
+                        ".tsx",
+                        ".js",
+                        ".jsx",
+                        ".json",
+                        ".yaml",
+                        ".yml",
+                        ".toml",
+                        ".md",
+                        ".sh",
+                    )
+                )
+                and not any(
+                    skip in item.get("path", "")
+                    for skip in ("node_modules", ".venv", "dist", "build", "lock")
+                )
             ][:15]
 
             for blob in blobs:
                 path = blob["path"]
                 try:
-                    content_data = await self._get_json(f"/repos/{repo_full_name}/contents/{path}?ref={head_sha}")
-                    raw_content = base64.b64decode(content_data.get("content", "")).decode("utf-8", errors="replace")
+                    content_data = await self._get_json(
+                        f"/repos/{repo_full_name}/contents/{path}?ref={head_sha}"
+                    )
+                    raw_content = base64.b64decode(content_data.get("content", "")).decode(
+                        "utf-8", errors="replace"
+                    )
                     lines = raw_content.splitlines()
-                    patch = f"@@ -0,0 +1,{len(lines)} @@\n" + "\n".join("+" + l for l in lines)
-                    changed_files.append(ChangedFile(path=path, status="modified", additions=len(lines), deletions=0, patch=patch))
-                except Exception:
+                    patch_head = f"@@ -0,0 +1,{len(lines)} @@\n"
+                    patch = patch_head + "\n".join("+" + line for line in lines)
+                    changed_files.append(
+                        ChangedFile(
+                            path=path,
+                            status="modified",
+                            additions=len(lines),
+                            deletions=0,
+                            patch=patch,
+                        )
+                    )
+                except Exception as exc:
+                    logger.debug("Failed reading file %s for repo PR: %s", path, exc)
                     continue
         except Exception as exc:
             logger.warning("Could not build full repo tree for %s: %s", repo_full_name, exc)

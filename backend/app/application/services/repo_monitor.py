@@ -1,6 +1,5 @@
 import asyncio
 import logging
-from typing import Any
 
 from app.application.events import PullRequestEvent
 from app.application.ports.cache_port import CachePort
@@ -81,7 +80,12 @@ class RepoMonitorService:
 
                 # Only review if not reviewed for this exact head commit
                 if await self._cache.set_if_absent(cache_key, "1", ttl_seconds=86400 * 14):
-                    logger.info("New/updated PR detected on %s: PR #%s @ %s", repo_full_name, pr_number, head_sha[:7])
+                    logger.info(
+                        "New/updated PR detected on %s: PR #%s @ %s",
+                        repo_full_name,
+                        pr_number,
+                        head_sha[:7],
+                    )
                     event = PullRequestEvent(
                         delivery_id=f"poll-{repo_full_name}-{pr_number}-{head_sha[:7]}",
                         action="synchronize",
