@@ -113,11 +113,11 @@ export const RepoSelector: React.FC<RepoSelectorProps> = ({ onAnalyze, isAnalyzi
               <polyline points="2 17 12 22 22 17" />
               <polyline points="2 12 12 17 22 12" />
             </svg>
-            Repository Selection
+            Repository Analysis & Remediation
           </div>
-          <h2 className="section-title">Connect & Analyze GitHub Repository</h2>
+          <h2 className="section-title">Automated Repository Analysis & Code Remediation</h2>
           <p className="section-desc">
-            Enter any public or private GitHub repository to trigger the LangGraph AI multi-agent code & security audit.
+            Enter any public or private GitHub repository URL to trigger the autonomous multi-agent analysis and two-stage Human-in-the-Loop remediation engine.
           </p>
         </div>
       </div>
@@ -133,7 +133,7 @@ export const RepoSelector: React.FC<RepoSelectorProps> = ({ onAnalyze, isAnalyzi
           <input
             type="text"
             className="repo-text-input"
-            placeholder="Paste GitHub Repository URL (e.g. https://github.com/owner/repo or owner/repo)"
+            placeholder="Enter GitHub Repository URL (e.g. https://github.com/owner/repo or owner/repo)"
             value={inputVal}
             onChange={handleInputChange}
             disabled={isAnalyzing}
@@ -149,14 +149,14 @@ export const RepoSelector: React.FC<RepoSelectorProps> = ({ onAnalyze, isAnalyzi
           {isAnalyzing ? (
             <>
               <div className="spinner small" />
-              <span>Analyzing Codebase...</span>
+              <span>Analyzing Repository...</span>
             </>
           ) : (
             <>
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
                 <polygon points="5 3 19 12 5 21 5 3" />
               </svg>
-              <span>Analyze Repository</span>
+              <span>Start Analysis Repo</span>
             </>
           )}
         </button>

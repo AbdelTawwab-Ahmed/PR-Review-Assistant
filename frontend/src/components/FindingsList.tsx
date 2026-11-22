@@ -8,6 +8,7 @@ interface FindingsListProps {
 
 export const FindingsList: React.FC<FindingsListProps> = ({ findings = [], count }) => {
   const [filterSeverity, setFilterSeverity] = useState<string>('ALL');
+  const [filterCategory, setFilterCategory] = useState<string>('ALL');
   const [searchQuery, setSearchQuery] = useState<string>('');
 
   const totalCount = count !== undefined ? count : findings.length;
@@ -26,14 +27,16 @@ export const FindingsList: React.FC<FindingsListProps> = ({ findings = [], count
     return findings.filter((f) => {
       const matchSeverity =
         filterSeverity === 'ALL' || f.severity.toLowerCase() === filterSeverity.toLowerCase();
+      const matchCategory =
+        filterCategory === 'ALL' || f.category.toLowerCase().includes(filterCategory.toLowerCase());
       const matchSearch =
         !searchQuery.trim() ||
         f.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
         f.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
         (f.file_path && f.file_path.toLowerCase().includes(searchQuery.toLowerCase()));
-      return matchSeverity && matchSearch;
+      return matchSeverity && matchCategory && matchSearch;
     });
-  }, [findings, filterSeverity, searchQuery]);
+  }, [findings, filterSeverity, filterCategory, searchQuery]);
 
   const getSeverityBadge = (sev: Severity | string) => {
     const s = sev.toLowerCase();
@@ -53,8 +56,11 @@ export const FindingsList: React.FC<FindingsListProps> = ({ findings = [], count
   const getCategoryIcon = (cat: string) => {
     const c = cat.toLowerCase();
     if (c.includes('security')) return '🛡️';
-    if (c.includes('bug') || c.includes('error')) return '🐛';
+    if (c.includes('bug') || c.includes('logic')) return '🐛';
     if (c.includes('perf')) return '⚡';
+    if (c.includes('depend')) return '📦';
+    if (c.includes('log') || c.includes('error')) return '📝';
+    if (c.includes('arch')) return '🏛️';
     return '📐';
   };
 
@@ -100,6 +106,29 @@ export const FindingsList: React.FC<FindingsListProps> = ({ findings = [], count
             </button>
           )}
         </div>
+      </div>
+
+      {/* Category Filter Chips */}
+      <div className="category-filter-row" style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '12px' }}>
+        {[
+          { id: 'ALL', label: 'All Categories' },
+          { id: 'security', label: '🛡️ Security' },
+          { id: 'bug', label: '🐛 Bugs & Logic' },
+          { id: 'perf', label: '⚡ Performance' },
+          { id: 'depend', label: '📦 Dependencies' },
+          { id: 'code_smell', label: '📐 Code Quality' },
+          { id: 'log', label: '📝 Logging & Errors' },
+          { id: 'arch', label: '🏛️ Architecture' },
+        ].map((cat) => (
+          <button
+            key={cat.id}
+            onClick={() => setFilterCategory(cat.id)}
+            className={`btn btn-sm ${filterCategory === cat.id ? 'btn-primary' : 'btn-secondary'}`}
+            style={{ fontSize: '12px', padding: '4px 12px', borderRadius: '16px' }}
+          >
+            {cat.label}
+          </button>
+        ))}
       </div>
 
       {/* Findings List or Empty State */}

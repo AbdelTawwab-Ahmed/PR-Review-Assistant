@@ -23,6 +23,8 @@ class ReviewState(TypedDict, total=False):
     final_findings: list[Finding]
     risk: RiskReport
     fix_requested: bool
+    plan_approval_decision: ApprovalDecision
+    plan_approval_feedback: str
     fix_plan: FixPlan
     proposal: FixProposal
     approval_decision: ApprovalDecision

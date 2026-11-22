@@ -12,7 +12,8 @@ S = RunStatus
 
 ALLOWED_TRANSITIONS: dict[RunStatus, frozenset[RunStatus]] = {
     S.PENDING: frozenset({S.ANALYZING, S.FAILED}),
-    S.ANALYZING: frozenset({S.PLANNING, S.FAILED}),
+    S.ANALYZING: frozenset({S.AWAITING_PLAN_APPROVAL, S.PLANNING, S.READY_TO_MERGE, S.FAILED}),
+    S.AWAITING_PLAN_APPROVAL: frozenset({S.PLANNING, S.REJECTED, S.FAILED}),
     S.PLANNING: frozenset({S.FIXING, S.UPDATING_PR, S.FAILED}),
     S.FIXING: frozenset({S.VALIDATING, S.FAILED}),
     S.VALIDATING: frozenset({S.AWAITING_APPROVAL, S.PLANNING, S.FAILED}),
@@ -75,7 +76,11 @@ class ReviewRun:
             self.transition_to(RunStatus.FAILED)
 
     def apply_approval(self, decision: ApprovalDecision) -> None:
-        if self.status is not RunStatus.AWAITING_APPROVAL:
+        if self.status not in (RunStatus.AWAITING_APPROVAL, RunStatus.AWAITING_PLAN_APPROVAL):
             raise InvalidApprovalError("Run is not awaiting approval")
         self.approval = decision
-        self.transition_to(_APPROVAL_TARGETS[decision])
+        if self.status is RunStatus.AWAITING_PLAN_APPROVAL:
+            target = RunStatus.PLANNING if decision is ApprovalDecision.APPROVE else RunStatus.REJECTED
+        else:
+            target = _APPROVAL_TARGETS[decision]
+        self.transition_to(target)

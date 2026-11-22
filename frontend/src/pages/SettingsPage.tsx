@@ -6,7 +6,7 @@ export const SettingsPage: React.FC = () => {
   const [copiedSecret, setCopiedSecret] = useState(false);
 
   const webhookUrl = 'https://gpgai2-ghdvf7b6caetf3ds.westus3-01.azurewebsites.net/api/webhooks/github';
-  const webhookSecret = '10bd3a4136709e8a8473cdb3c983b193d22699586bdb8a66e9a617eed2e3193f';
+  const webhookSecret = '••••••••••••••••••••••••••••••••';
 
   useEffect(() => {
     fetch('/api/health/ready')
@@ -125,7 +125,7 @@ export const SettingsPage: React.FC = () => {
           </div>
 
           <div className="webhook-instructions">
-            <strong>Required Events:</strong> Select <code>Let me select individual events</code> &rarr; check <code>Pull requests</code>.
+            <strong>Required Events:</strong> Select <code>Let me select individual events</code> &rarr; check <code>Pull requests</code>. Secret is configured securely in Azure backend.
           </div>
         </div>
       </div>

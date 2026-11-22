@@ -60,6 +60,9 @@ class GitHubClient:
         repo_full_name: str,
         number: int,
     ) -> PullRequest:
+        if number == 0:
+            return await self.get_repository_as_pr(repo_full_name)
+
         pr = await self._get_json(f"/repos/{repo_full_name}/pulls/{number}")
 
         head_sha = pr["head"]["sha"]
@@ -79,6 +82,50 @@ class GitHubClient:
             files=files,
             draft=bool(pr.get("draft", False)),
             from_fork=(head_repo is not None and head_repo.lower() != base_repo.lower()),
+        )
+
+    async def get_repository_as_pr(self, repo_full_name: str) -> PullRequest:
+        """Construct a virtual PullRequest representing full repository contents on the default branch."""
+        import base64
+        repo_info = await self._get_json(f"/repos/{repo_full_name}")
+        default_branch = repo_info.get("default_branch", "main")
+        commit_info = await self._get_json(f"/repos/{repo_full_name}/commits/{default_branch}")
+        head_sha = commit_info["sha"]
+
+        changed_files: list[ChangedFile] = []
+        try:
+            tree_data = await self._get_json(f"/repos/{repo_full_name}/git/trees/{head_sha}?recursive=1")
+            blobs = [
+                item for item in tree_data.get("tree", [])
+                if item.get("type") == "blob"
+                and any(item.get("path", "").endswith(ext) for ext in (".py", ".ts", ".tsx", ".js", ".jsx", ".json", ".yaml", ".yml", ".toml", ".md", ".sh"))
+                and not any(skip in item.get("path", "") for skip in ("node_modules", ".venv", "dist", "build", "lock"))
+            ][:15]
+
+            for blob in blobs:
+                path = blob["path"]
+                try:
+                    content_data = await self._get_json(f"/repos/{repo_full_name}/contents/{path}?ref={head_sha}")
+                    raw_content = base64.b64decode(content_data.get("content", "")).decode("utf-8", errors="replace")
+                    lines = raw_content.splitlines()
+                    patch = f"@@ -0,0 +1,{len(lines)} @@\n" + "\n".join("+" + l for l in lines)
+                    changed_files.append(ChangedFile(path=path, status="modified", additions=len(lines), deletions=0, patch=patch))
+                except Exception:
+                    continue
+        except Exception as exc:
+            logger.warning("Could not build full repo tree for %s: %s", repo_full_name, exc)
+
+        return PullRequest(
+            repo_full_name=repo_full_name,
+            number=0,
+            title=f"Repository Audit: {repo_full_name} ({default_branch})",
+            author=repo_info.get("owner", {}).get("login", "system"),
+            base_branch=default_branch,
+            head_branch=default_branch,
+            head_sha=head_sha,
+            files=tuple(changed_files),
+            draft=False,
+            from_fork=False,
         )
 
     async def list_open_pulls(

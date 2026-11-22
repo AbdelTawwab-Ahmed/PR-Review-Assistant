@@ -56,7 +56,13 @@ export const LiveAnalysisTracker: React.FC<LiveAnalysisTrackerProps> = ({
         if (isCancelled) return;
         setCurrentRun(detail);
 
-        if (detail.status === 'awaiting_approval' || detail.status === 'ready_to_merge' || detail.status === 'rejected' || detail.status === 'failed') {
+        if (
+          detail.status === 'awaiting_plan_approval' ||
+          detail.status === 'awaiting_approval' ||
+          detail.status === 'ready_to_merge' ||
+          detail.status === 'rejected' ||
+          detail.status === 'failed'
+        ) {
           setIsDone(true);
           onAnalysisCompleted(detail);
         }

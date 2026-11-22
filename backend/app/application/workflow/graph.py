@@ -12,6 +12,7 @@ from app.application.workflow.nodes.analyze_chunk import make_analyze_chunk
 from app.application.workflow.nodes.apply_fixes import make_apply_fixes
 from app.application.workflow.nodes.fetch_context import make_fetch_context
 from app.application.workflow.nodes.hitl_approval import make_hitl_approval
+from app.application.workflow.nodes.hitl_plan_approval import make_hitl_plan_approval
 from app.application.workflow.nodes.impact_analysis import make_impact_analysis
 from app.application.workflow.nodes.plan_analysis import make_plan_analysis
 from app.application.workflow.nodes.plan_fixes import make_plan_fixes
@@ -45,7 +46,20 @@ def make_fan_out(static_enabled: bool):
 
 
 def after_risk(state: ReviewState) -> str:
-    return "plan_fixes" if state.get("fix_requested") else END
+    """If issues are detected, pause at Stage 1 HITL for human remediation authorization.
+    If repository is clean with no issues, terminate successfully."""
+    findings = state.get("final_findings", [])
+    if not findings:
+        return END
+    return "hitl_plan_approval" if state.get("fix_requested", True) else END
+
+
+def after_plan_approval(state: ReviewState) -> str:
+    """Stage 1 Gate: Proceed to remediation agents only if human explicitly authorized."""
+    decision = state.get("plan_approval_decision")
+    if decision == ApprovalDecision.APPROVE:
+        return "plan_fixes"
+    return END
 
 
 def after_plan(state: ReviewState) -> str:
@@ -99,12 +113,14 @@ def build_analysis_graph(deps: WorkflowDeps, checkpointer: Any = None):
     graph.add_edge("aggregate_findings", "score_risk")
 
     if deps.fix_engine is not None:
+        graph.add_node("hitl_plan_approval", make_hitl_plan_approval())
         graph.add_node("plan_fixes", make_plan_fixes(deps.fix_min_severity, deps.fix_max_files))
         graph.add_node("apply_fixes", make_apply_fixes(deps.fix_engine))
         graph.add_node("hitl_approval", make_hitl_approval())
         graph.add_node("update_pr", make_update_pr(deps.publisher))
 
-        graph.add_conditional_edges("score_risk", after_risk, ["plan_fixes", END])
+        graph.add_conditional_edges("score_risk", after_risk, ["hitl_plan_approval", END])
+        graph.add_conditional_edges("hitl_plan_approval", after_plan_approval, ["plan_fixes", END])
         graph.add_conditional_edges("plan_fixes", after_plan, ["apply_fixes", END])
         graph.add_conditional_edges("apply_fixes", after_apply_fixes, ["hitl_approval", END])
         graph.add_conditional_edges("hitl_approval", after_hitl, ["update_pr", "plan_fixes", END])

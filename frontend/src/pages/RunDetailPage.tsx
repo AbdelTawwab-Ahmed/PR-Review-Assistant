@@ -23,8 +23,15 @@ export const RunDetailPage: React.FC = () => {
 
   const [activeTab, setActiveTab] = useState<'proposal' | 'findings' | 'risk' | 'notes'>('proposal');
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [modalStage, setModalStage] = useState<'plan' | 'final'>('final');
   const [actionError, setActionError] = useState<string | null>(null);
   const [copiedSha, setCopiedSha] = useState(false);
+
+  React.useEffect(() => {
+    if (run?.status === 'awaiting_plan_approval') {
+      setActiveTab('findings');
+    }
+  }, [run?.status]);
 
   const handleApprovalSubmit = async (decision: ApprovalDecision, feedback: string) => {
     setActionError(null);
@@ -77,7 +84,9 @@ export const RunDetailPage: React.FC = () => {
     );
   }
 
-  const isAwaiting = run.status === 'awaiting_approval';
+  const isAwaitingPlan = run.status === 'awaiting_plan_approval';
+  const isAwaitingFinal = run.status === 'awaiting_approval';
+  const isClean = run.status === 'ready_to_merge' && (!run.findings_count || run.findings_count === 0);
   const findingsCount = run.findings_count || run.findings?.length || 0;
   const fileChangesCount = run.proposal?.changes?.length || 0;
 
@@ -170,8 +179,26 @@ export const RunDetailPage: React.FC = () => {
       {/* Interactive LangGraph Agent Pipeline */}
       <AgentPipeline status={run.status as RunStatus} />
 
-      {/* Human In The Loop Action Gate Banner */}
-      {isAwaiting && (
+      {/* Clean Repository Success State */}
+      {isClean && (
+        <div className="hitl-banner-elevated" style={{ borderColor: 'rgba(16, 185, 129, 0.4)', background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.08), rgba(6, 78, 59, 0.15))' }}>
+          <div className="hitl-badge-pulse" style={{ background: 'rgba(16, 185, 129, 0.15)' }}>
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#10B981" strokeWidth="2.2">
+              <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+              <polyline points="22 4 12 14.01 9 11.01" />
+            </svg>
+          </div>
+          <div className="hitl-content">
+            <h3 className="hitl-headline" style={{ color: '#10B981' }}>Repository Is Clean — No Issues Detected</h3>
+            <p className="hitl-body">
+              The multi-agent inspection concluded successfully. No security vulnerabilities, logic defects, or high-risk problems were identified. Workflow terminated cleanly with zero modifications needed.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Stage 1: Initial Remediation Authorization Gate */}
+      {isAwaitingPlan && (
         <div className="hitl-banner-elevated">
           <div className="hitl-glow-orb" />
           <div className="hitl-badge-pulse">
@@ -180,20 +207,52 @@ export const RunDetailPage: React.FC = () => {
             </svg>
           </div>
           <div className="hitl-content">
-            <h3 className="hitl-headline">Human Authorization Required (HITL Gate)</h3>
+            <h3 className="hitl-headline">Gate 1: Remediation Authorization Required</h3>
             <p className="hitl-body">
-              The agentic workflow has proposed automated code changes and validated them with tests. 
-              Review the code diff below and authorize the changes to publish them to GitHub.
+              The agent has inspected the repository and detected {findingsCount} issue(s). <strong>Under strict HITL constraints, no code modifications have taken place.</strong> Review the detected issues below and authorize the remediation agents to formulate and test fixes.
             </p>
           </div>
           <button
-            onClick={() => setIsModalOpen(true)}
+            onClick={() => {
+              setModalStage('plan');
+              setIsModalOpen(true);
+            }}
             className="btn btn-primary btn-authorize-glow"
           >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
               <polyline points="20 6 9 17 4 12" />
             </svg>
-            Review & Authorize
+            Review & Authorize Remediation
+          </button>
+        </div>
+      )}
+
+      {/* Stage 2: Remediation Review Gate */}
+      {isAwaitingFinal && (
+        <div className="hitl-banner-elevated">
+          <div className="hitl-glow-orb" />
+          <div className="hitl-badge-pulse">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#10B981" strokeWidth="2.2">
+              <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          </div>
+          <div className="hitl-content">
+            <h3 className="hitl-headline">Gate 2: Remediation Review & PR Approval</h3>
+            <p className="hitl-body">
+              Remediation agents formulated patches and validated them with test suites in an isolated sandbox. Review the side-by-side diff below and authorize creating a Pull Request on GitHub.
+            </p>
+          </div>
+          <button
+            onClick={() => {
+              setModalStage('final');
+              setIsModalOpen(true);
+            }}
+            className="btn btn-primary btn-authorize-glow"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+              <polyline points="20 6 9 17 4 12" />
+            </svg>
+            Review & Publish PR
           </button>
         </div>
       )}
@@ -314,6 +373,7 @@ export const RunDetailPage: React.FC = () => {
         onClose={() => setIsModalOpen(false)}
         onSubmit={handleApprovalSubmit}
         isLoading={approveMutation.isPending}
+        stage={modalStage}
       />
     </div>
   );

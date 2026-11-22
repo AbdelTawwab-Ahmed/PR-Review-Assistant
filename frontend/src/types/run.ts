@@ -1,6 +1,7 @@
 export type RunStatus =
   | 'pending'
   | 'analyzing'
+  | 'awaiting_plan_approval'
   | 'planning'
   | 'fixing'
   | 'validating'

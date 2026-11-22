@@ -31,6 +31,10 @@ class FindingCategory(StrEnum):
     CODE_SMELL = "code_smell"
     DESIGN = "design"
     STYLE = "style"
+    PERFORMANCE = "performance"
+    DEPENDENCY = "dependency"
+    LOGGING = "logging"
+    ARCHITECTURE = "architecture"
 
 
 class RiskLevel(StrEnum):
@@ -43,6 +47,7 @@ class RiskLevel(StrEnum):
 class RunStatus(StrEnum):
     PENDING = "pending"
     ANALYZING = "analyzing"
+    AWAITING_PLAN_APPROVAL = "awaiting_plan_approval"
     PLANNING = "planning"
     FIXING = "fixing"
     VALIDATING = "validating"

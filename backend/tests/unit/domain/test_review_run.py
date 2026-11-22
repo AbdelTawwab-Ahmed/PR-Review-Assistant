@@ -77,3 +77,16 @@ def test_approval_outside_approval_stage_raises() -> None:
     run = make_run()
     with pytest.raises(InvalidApprovalError):
         run.apply_approval(ApprovalDecision.APPROVE)
+
+
+def test_two_stage_hitl_transitions() -> None:
+    run = make_run()
+    advance(run, RunStatus.ANALYZING, RunStatus.AWAITING_PLAN_APPROVAL)
+    run.apply_approval(ApprovalDecision.APPROVE)
+    assert run.status is RunStatus.PLANNING
+
+    advance(run, RunStatus.FIXING, RunStatus.VALIDATING, RunStatus.AWAITING_APPROVAL)
+    run.apply_approval(ApprovalDecision.APPROVE)
+    assert run.status is RunStatus.UPDATING_PR
+    run.transition_to(RunStatus.READY_TO_MERGE)
+    assert run.is_terminal

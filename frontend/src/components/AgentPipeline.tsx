@@ -13,13 +13,13 @@ interface Step {
 }
 
 const PIPELINE_STEPS: Step[] = [
-  { id: 'ingest', name: 'PR Ingestion', description: 'Diffs & commits fetched', icon: '📥' },
-  { id: 'analysis', name: 'Static Analysis', description: 'Ruff, Bandit & Semgrep', icon: '🔍' },
-  { id: 'risk', name: 'Risk Scoring', description: 'Blast radius evaluation', icon: '⚖️' },
-  { id: 'fix', name: 'Agentic Fixer', description: 'Multi-agent LLM reasoning', icon: '🤖' },
-  { id: 'validate', name: 'Validation', description: 'Pytest suite execution', icon: '🧪' },
-  { id: 'hitl', name: 'Human Gate', description: 'HITL Authorization', icon: '🛡️' },
-  { id: 'merge', name: 'PR Published', description: 'Fix branch committed', icon: '🚀' },
+  { id: 'ingest', name: 'Repo Ingestion', description: 'Project structure & files indexed', icon: '📥' },
+  { id: 'analysis', name: 'Deep Analysis', description: 'Bugs, security, perf & error handling', icon: '🔍' },
+  { id: 'hitl1', name: 'Gate 1: Authorization', description: 'Human approval for remediation', icon: '🛡️' },
+  { id: 'remediation', name: 'Remediation Agents', description: 'Targeted code patches formulated', icon: '🤖' },
+  { id: 'validation', name: 'Sandbox Validation', description: 'Pytest & linting regression checks', icon: '🧪' },
+  { id: 'hitl2', name: 'Gate 2: Diff Review', description: 'Human review of verified fixes', icon: '⚖️' },
+  { id: 'published', name: 'PR Published', description: 'Verified branch & pull request created', icon: '🚀' },
 ];
 
 function getStepState(
@@ -29,20 +29,22 @@ function getStepState(
   if (currentStatus === 'failed') {
     return 'failed';
   }
-  if (currentStatus === 'rejected' && stepIndex === 5) {
-    return 'rejected';
+  if (currentStatus === 'rejected') {
+    // Stage 1 or Stage 2 rejection
+    if (stepIndex === 2 || stepIndex === 5) return 'rejected';
   }
 
   const statusToIndex: Record<RunStatus, number> = {
     pending: 0,
     analyzing: 1,
-    planning: 2,
+    awaiting_plan_approval: 2,
+    planning: 3,
     fixing: 3,
     validating: 4,
     awaiting_approval: 5,
     updating_pr: 6,
     ready_to_merge: 6,
-    rejected: 5,
+    rejected: 2,
     failed: 1,
   };
 

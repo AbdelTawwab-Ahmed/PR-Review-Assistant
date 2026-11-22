@@ -151,7 +151,7 @@ async def analyze_repository(
     pr_num = body.pr_number or pr_from_url
 
     if pr_num is None:
-        # Find active open PR on the repo
+        # Check for active open PRs on the repo, else audit full repository on default branch
         open_prs = await container.github.list_open_pulls(repo_clean)
         if open_prs:
             pr_num = open_prs[0]["number"]
@@ -163,10 +163,7 @@ async def analyze_repository(
             except Exception:
                 pass
             if pr_num is None:
-                raise HTTPException(
-                    status_code=400,
-                    detail=f"No pull requests found on {repo_clean}. Please open a pull request or specify a PR number (e.g. {repo_clean}#1).",
-                )
+                pr_num = 0  # Trigger comprehensive repository-level analysis
 
     pr_info = await container.github.get_pull_request(repo_clean, pr_num)
     event = PullRequestEvent(

@@ -6,6 +6,7 @@ interface ApprovalModalProps {
   onClose: () => void;
   onSubmit: (decision: ApprovalDecision, feedback: string) => Promise<void>;
   isLoading: boolean;
+  stage?: 'plan' | 'final';
 }
 
 export const ApprovalModal: React.FC<ApprovalModalProps> = ({
@@ -13,6 +14,7 @@ export const ApprovalModal: React.FC<ApprovalModalProps> = ({
   onClose,
   onSubmit,
   isLoading,
+  stage = 'final',
 }) => {
   const [decision, setDecision] = useState<ApprovalDecision>('approve');
   const [feedback, setFeedback] = useState('');
@@ -25,6 +27,8 @@ export const ApprovalModal: React.FC<ApprovalModalProps> = ({
     onClose();
   };
 
+  const isPlanStage = stage === 'plan';
+
   return (
     <div className="modal-backdrop-blur">
       <div className="modal-dialog-elevated">
@@ -35,9 +39,13 @@ export const ApprovalModal: React.FC<ApprovalModalProps> = ({
             </svg>
           </div>
           <div>
-            <h3 className="modal-heading">Human-in-the-Loop Authorization</h3>
+            <h3 className="modal-heading">
+              {isPlanStage ? 'Gate 1: Remediation Authorization' : 'Gate 2: Remediation Review & PR Authorization'}
+            </h3>
             <p className="modal-subheading">
-              Review and authorize the AI agent's proposed remediation before publishing to GitHub
+              {isPlanStage
+                ? 'Explicit human authorization required before AI agents are permitted to modify repository code.'
+                : 'Review the verified code diff and test execution results before creating a GitHub pull request.'}
             </p>
           </div>
           <button onClick={onClose} className="modal-close-x" disabled={isLoading}>
@@ -57,29 +65,35 @@ export const ApprovalModal: React.FC<ApprovalModalProps> = ({
               />
               <div className="card-indicator" />
               <div className="card-body">
-                <span className="card-title">✅ Approve & Push Fix</span>
+                <span className="card-title">
+                  {isPlanStage ? '✅ Authorize Remediation Agents' : '✅ Approve & Publish Pull Request'}
+                </span>
                 <span className="card-desc">
-                  Authorize the changes. The agent will create a fix commit and push it to the PR branch.
+                  {isPlanStage
+                    ? 'Permit the multi-agent fixer to formulate code patches and run validation tests in an isolated sandbox.'
+                    : 'Authorize the verified changes. The system will create a fix branch and open a Pull Request.'}
                 </span>
               </div>
             </label>
 
-            <label className={`decision-card ${decision === 'request_changes' ? 'selected-changes' : ''}`}>
-              <input
-                type="radio"
-                name="decision"
-                value="request_changes"
-                checked={decision === 'request_changes'}
-                onChange={() => setDecision('request_changes')}
-              />
-              <div className="card-indicator" />
-              <div className="card-body">
-                <span className="card-title">🔄 Request Changes</span>
-                <span className="card-desc">
-                  Ask the multi-agent fixer to replan and adapt the solution using your feedback below.
-                </span>
-              </div>
-            </label>
+            {!isPlanStage && (
+              <label className={`decision-card ${decision === 'request_changes' ? 'selected-changes' : ''}`}>
+                <input
+                  type="radio"
+                  name="decision"
+                  value="request_changes"
+                  checked={decision === 'request_changes'}
+                  onChange={() => setDecision('request_changes')}
+                />
+                <div className="card-indicator" />
+                <div className="card-body">
+                  <span className="card-title">🔄 Request Revisions</span>
+                  <span className="card-desc">
+                    Ask the fixer agents to replan and adapt the solution using your feedback below.
+                  </span>
+                </div>
+              </label>
+            )}
 
             <label className={`decision-card ${decision === 'reject' ? 'selected-reject' : ''}`}>
               <input
@@ -91,9 +105,13 @@ export const ApprovalModal: React.FC<ApprovalModalProps> = ({
               />
               <div className="card-indicator" />
               <div className="card-body">
-                <span className="card-title">⛔ Reject Proposal</span>
+                <span className="card-title">
+                  {isPlanStage ? '⛔ Reject Remediation' : '⛔ Reject Proposal'}
+                </span>
                 <span className="card-desc">
-                  Dismiss the proposed changes without modifying the PR branch or committing files.
+                  {isPlanStage
+                    ? 'Terminate workflow without making any modifications to the repository.'
+                    : 'Dismiss the proposed changes without modifying the repository or publishing a branch.'}
                 </span>
               </div>
             </label>

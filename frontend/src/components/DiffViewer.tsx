@@ -5,6 +5,48 @@ interface DiffViewerProps {
   changes: FileChange[];
 }
 
+interface DiffRow {
+  type: 'equal' | 'add' | 'del';
+  text: string;
+  oldNum?: number;
+  newNum?: number;
+}
+
+function computeLcsDiff(origLines: string[], newLines: string[]): DiffRow[] {
+  const n = Math.min(origLines.length, 600);
+  const m = Math.min(newLines.length, 600);
+  const dp: number[][] = Array.from({ length: n + 1 }, () => new Array(m + 1).fill(0));
+
+  for (let i = 0; i < n; i++) {
+    for (let j = 0; j < m; j++) {
+      if (origLines[i] === newLines[j]) {
+        dp[i + 1][j + 1] = dp[i][j] + 1;
+      } else {
+        dp[i + 1][j + 1] = Math.max(dp[i + 1][j], dp[i][j + 1]);
+      }
+    }
+  }
+
+  const result: DiffRow[] = [];
+  let i = n;
+  let j = m;
+
+  while (i > 0 || j > 0) {
+    if (i > 0 && j > 0 && origLines[i - 1] === newLines[j - 1]) {
+      result.unshift({ type: 'equal', text: origLines[i - 1], oldNum: i, newNum: j });
+      i--;
+      j--;
+    } else if (j > 0 && (i === 0 || dp[i][j - 1] >= dp[i - 1][j])) {
+      result.unshift({ type: 'add', text: newLines[j - 1], newNum: j });
+      j--;
+    } else if (i > 0) {
+      result.unshift({ type: 'del', text: origLines[i - 1], oldNum: i });
+      i--;
+    }
+  }
+  return result;
+}
+
 export const DiffViewer: React.FC<DiffViewerProps> = ({ changes }) => {
   const [activeFileIndex, setActiveFileIndex] = useState(0);
   const [viewMode, setViewMode] = useState<'split' | 'unified'>('split');
@@ -28,8 +70,12 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({ changes }) => {
 
   const activeFile = changes[activeFileIndex] || changes[0];
 
-  const origLines = activeFile.original_content ? activeFile.original_content.split('\n') : [];
-  const updatedLines = activeFile.updated_content ? activeFile.updated_content.split('\n') : [];
+  const origLines = (activeFile.original_content || '').split('\n');
+  const updatedLines = (activeFile.updated_content || '').split('\n');
+  const diffRows = computeLcsDiff(origLines, updatedLines);
+
+  const additions = diffRows.filter((r) => r.type === 'add').length;
+  const deletions = diffRows.filter((r) => r.type === 'del').length;
 
   return (
     <div className="diff-viewer-elevated">
@@ -75,8 +121,8 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({ changes }) => {
         <div className="file-name-meta">
           <span className="file-icon">📄</span>
           <code className="file-full-path">{activeFile.path}</code>
-          <span className="diff-stat-chip added">+{updatedLines.length}</span>
-          <span className="diff-stat-chip deleted">-{origLines.length}</span>
+          <span className="diff-stat-chip added">+{additions}</span>
+          <span className="diff-stat-chip deleted">-{deletions}</span>
         </div>
         <span className="ai-verified-tag">✨ AI Remediated</span>
       </div>
@@ -87,13 +133,13 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({ changes }) => {
           <div className="diff-pane original-pane">
             <div className="diff-pane-header">Original Base Code</div>
             <div className="code-scroll-pane">
-              {origLines.map((line, idx) => {
-                const isDifferent = updatedLines[idx] !== line;
+              {diffRows.map((row, idx) => {
+                if (row.type === 'add') return <div key={idx} className="code-row row-empty">&nbsp;</div>;
                 return (
-                  <div key={idx} className={`code-row ${isDifferent ? 'row-removed' : ''}`}>
-                    <span className="row-num">{idx + 1}</span>
-                    <span className="row-sign">{isDifferent ? '-' : ' '}</span>
-                    <pre className="row-text">{line || ' '}</pre>
+                  <div key={idx} className={`code-row ${row.type === 'del' ? 'row-removed' : ''}`}>
+                    <span className="row-num">{row.oldNum || ' '}</span>
+                    <span className="row-sign">{row.type === 'del' ? '-' : ' '}</span>
+                    <pre className="row-text">{row.text || ' '}</pre>
                   </div>
                 );
               })}
@@ -101,15 +147,15 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({ changes }) => {
           </div>
 
           <div className="diff-pane updated-pane">
-            <div className="diff-pane-header">Proposed AI Solution</div>
+            <div className="diff-pane-header">Remediated Code Solution</div>
             <div className="code-scroll-pane">
-              {updatedLines.map((line, idx) => {
-                const isDifferent = origLines[idx] !== line;
+              {diffRows.map((row, idx) => {
+                if (row.type === 'del') return <div key={idx} className="code-row row-empty">&nbsp;</div>;
                 return (
-                  <div key={idx} className={`code-row ${isDifferent ? 'row-added' : ''}`}>
-                    <span className="row-num">{idx + 1}</span>
-                    <span className="row-sign">{isDifferent ? '+' : ' '}</span>
-                    <pre className="row-text">{line || ' '}</pre>
+                  <div key={idx} className={`code-row ${row.type === 'add' ? 'row-added' : ''}`}>
+                    <span className="row-num">{row.newNum || ' '}</span>
+                    <span className="row-sign">{row.type === 'add' ? '+' : ' '}</span>
+                    <pre className="row-text">{row.text || ' '}</pre>
                   </div>
                 );
               })}
@@ -119,14 +165,14 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({ changes }) => {
       ) : (
         <div className="unified-diff-container">
           <div className="code-scroll-pane">
-            {updatedLines.map((line, idx) => {
-              const origLine = origLines[idx];
-              const isAdded = origLine !== line;
+            {diffRows.map((row, idx) => {
+              const rowClass = row.type === 'add' ? 'row-added' : row.type === 'del' ? 'row-removed' : '';
+              const sign = row.type === 'add' ? '+' : row.type === 'del' ? '-' : ' ';
               return (
-                <div key={idx} className={`code-row ${isAdded ? 'row-added' : ''}`}>
-                  <span className="row-num">{idx + 1}</span>
-                  <span className="row-sign">{isAdded ? '+' : ' '}</span>
-                  <pre className="row-text">{line || ' '}</pre>
+                <div key={idx} className={`code-row ${rowClass}`}>
+                  <span className="row-num">{row.oldNum || row.newNum || ' '}</span>
+                  <span className="row-sign">{sign}</span>
+                  <pre className="row-text">{row.text || ' '}</pre>
                 </div>
               );
             })}
