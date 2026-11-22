@@ -82,9 +82,24 @@ export const LiveAnalysisTracker: React.FC<LiveAnalysisTrackerProps> = ({
       return index === 0 ? 'active' : 'pending';
     }
     if (status === 'analyzing') {
-      if (index < 2) return 'completed';
-      if (index === 2 || index === 3) return 'active';
-      return 'pending';
+      // Smoothly advance through the stages as the analysis progresses
+      if (elapsed < 12) {
+        if (index === 0) return 'completed';
+        if (index === 1) return 'active';
+        return 'pending';
+      } else if (elapsed < 30) {
+        if (index < 2) return 'completed';
+        if (index === 2) return 'active';
+        return 'pending';
+      } else if (elapsed < 50) {
+        if (index < 3) return 'completed';
+        if (index === 3) return 'active';
+        return 'pending';
+      } else {
+        if (index < 4) return 'completed';
+        if (index === 4) return 'active';
+        return 'pending';
+      }
     }
     if (status === 'planning') {
       if (index < 4) return 'completed';
@@ -159,6 +174,21 @@ export const LiveAnalysisTracker: React.FC<LiveAnalysisTrackerProps> = ({
           );
         })}
       </div>
+
+      {elapsed > 60 && !isDone && (
+        <div style={{ marginTop: '1.25rem', padding: '0.85rem 1.25rem', background: 'rgba(234, 179, 8, 0.08)', border: '1px solid rgba(234, 179, 8, 0.3)', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem' }}>
+          <div style={{ fontSize: '0.875rem', color: '#facc15', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <span>⏱️</span>
+            <span>Analysis running on Azure OpenAI GPT-4.1. If this run was previously blocked, you can refresh or re-analyze.</span>
+          </div>
+          <button
+            onClick={() => window.location.reload()}
+            style={{ padding: '0.45rem 1rem', fontSize: '0.8rem', background: '#2563eb', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 600, whiteSpace: 'nowrap' }}
+          >
+            Refresh Status
+          </button>
+        </div>
+      )}
     </div>
   );
 };

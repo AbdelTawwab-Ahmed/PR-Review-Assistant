@@ -1,8 +1,10 @@
+import uuid
 from typing import Annotated, Any
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
 
 from app.application.events import PullRequestEvent
+from app.application.use_cases.handle_pr_event import EventOutcome
 from app.core.container import Container
 from app.interfaces.api.deps import get_container
 
@@ -161,7 +163,7 @@ async def analyze_repository(
 
     pr_info = await container.github.get_pull_request(repo_clean, pr_num)
     event = PullRequestEvent(
-        delivery_id=f"manual-{pr_info.head_sha[:7]}",
+        delivery_id=f"manual-{pr_info.head_sha[:7]}-{uuid.uuid4().hex[:8]}",
         action="synchronize",
         repo_full_name=repo_clean,
         number=pr_num,
@@ -173,6 +175,9 @@ async def analyze_repository(
         sender=pr_info.author,
     )
     outcome = await container.handle_pr_event.execute(event)
+    if outcome == EventOutcome.DUPLICATE:
+        await container.handle_pr_event._dispatcher.dispatch(event)
+        outcome = EventOutcome.ACCEPTED
     run_id = f"{repo_clean}#{pr_num}#{pr_info.head_sha[:7]}"
 
     return {
