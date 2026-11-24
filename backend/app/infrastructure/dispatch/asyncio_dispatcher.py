@@ -75,7 +75,19 @@ class AsyncioRunDispatcher:
             # Update run entity with findings and risk
             run.findings = list(result.findings)
             run.risk = result.risk
+            if result.notes:
+                run.failure_history.extend(result.notes)
             run.updated_at = datetime.now(UTC)
+
+            llm_analysis_failed = not result.findings and any(
+                "could not analyze" in note for note in result.notes
+            )
+
+            if llm_analysis_failed:
+                run.status = RunStatus.FAILED
+                await self._repository.save(run)
+                logger.error("Run %s failed because LLM analysis could not complete: %s", run_id, result.notes)
+                return
 
             if result.awaiting_approval:
                 run.status = RunStatus.AWAITING_APPROVAL

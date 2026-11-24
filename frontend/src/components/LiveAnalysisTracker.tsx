@@ -41,11 +41,12 @@ export const LiveAnalysisTracker: React.FC<LiveAnalysisTrackerProps> = ({
 
   // Timer
   useEffect(() => {
+    if (isDone || pollError) return;
     const timer = setInterval(() => {
       setElapsed((prev) => prev + 1);
     }, 1000);
     return () => clearInterval(timer);
-  }, []);
+  }, [isDone, pollError]);
 
   // Poll backend run status
   useEffect(() => {

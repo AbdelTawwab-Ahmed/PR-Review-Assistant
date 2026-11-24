@@ -17,3 +17,20 @@ def test_ready_reports_cache_status() -> None:
     client = TestClient(test_app)
     response = client.get("/api/health/ready")
     assert response.json() == {"status": "ok", "cache": "up"}
+
+
+def test_llm_health_reports_non_secret_status() -> None:
+    client = TestClient(app)
+    response = client.get("/api/health/llm")
+    assert response.status_code == 200
+    body = response.json()
+    assert set(body) == {
+        "configured",
+        "has_endpoint",
+        "has_api_key",
+        "deployment_strong",
+        "deployment_fast",
+        "api_version",
+        "environment",
+    }
+    assert isinstance(body["configured"], bool)
