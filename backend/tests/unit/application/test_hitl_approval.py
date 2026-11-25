@@ -269,3 +269,60 @@ async def test_unverified_fix_reaches_gate2_and_publishes_when_allowed() -> None
     saved_after_gate2 = await repo.get_by_id("run-unverified-1")
     assert saved_after_gate2 is not None
     assert saved_after_gate2.status == RunStatus.READY_TO_MERGE
+
+
+async def test_publish_permission_denied_marks_run_failed_with_clear_note() -> None:
+    from app.application.ports.github_port import GitHubError
+    from app.domain.entities.review_run import ReviewRun
+    from app.infrastructure.persistence.repositories import InMemoryReviewRunRepository
+
+    class ReadOnlyGitHub(FakeGitHub):
+        async def commit_files_to_new_branch(self, *args, **kwargs) -> str:
+            raise GitHubError("POST /repos/org/repo/git/trees returned 403", 403)
+
+    pr = make_pr()
+    gh = ReadOnlyGitHub(pr)
+    checkpointer = MemorySaver()
+    graph = build_analysis_graph(
+        WorkflowDeps(
+            github=gh,
+            llm=llm_with_finding(),
+            fix_engine=FakeEngine(PUBLISHABLE_PROPOSAL),
+            publisher=PublishFix(gh),
+        ),
+        checkpointer=checkpointer,
+    )
+
+    config = {"configurable": {"thread_id": "run-403-1"}}
+    await graph.ainvoke(
+        {
+            "repo_full_name": "org/repo",
+            "pr_number": 1,
+            "fix_requested": True,
+            "plan_approval_decision": ApprovalDecision.APPROVE,
+        },
+        config=config,
+    )
+
+    repo = InMemoryReviewRunRepository()
+    await repo.save(
+        ReviewRun(
+            id="run-403-1",
+            repo_full_name="org/repo",
+            pr_number=1,
+            head_sha="abc123",
+            status=RunStatus.AWAITING_APPROVAL,
+        )
+    )
+
+    result = await ApproveRun(graph, repo).execute("run-403-1", ApprovalDecision.APPROVE)
+    assert result.published_pr_url is None
+    assert any("HTTP 403" in note for note in result.notes)
+
+    saved = await repo.get_by_id("run-403-1")
+    assert saved is not None
+    assert saved.status == RunStatus.FAILED
+
+    status_res = await GetRunStatus(graph).execute("run-403-1")
+    assert status_res.status == RunStatus.FAILED
+    assert status_res.proposal is not None

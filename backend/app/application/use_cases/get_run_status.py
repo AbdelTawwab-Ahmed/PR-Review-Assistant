@@ -58,6 +58,17 @@ class GetRunStatus:
             or values.get("plan_approval_decision") == ApprovalDecision.REJECT
         ):
             status = RunStatus.REJECTED
+        elif any(
+            note.startswith(
+                (
+                    "GitHub write permission denied",
+                    "Failed to publish fix",
+                    "Unexpected error publishing fix",
+                )
+            )
+            for note in values.get("notes", ())
+        ):
+            status = RunStatus.FAILED
         elif values.get("proposal"):
             status = RunStatus.VALIDATING
         elif values.get("fix_plan"):

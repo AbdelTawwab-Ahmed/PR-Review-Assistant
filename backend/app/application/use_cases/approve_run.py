@@ -92,6 +92,16 @@ class ApproveRun:
                 for note in notes:
                     if note not in run.failure_history:
                         run.failure_history.append(note)
+                publish_failed = any(
+                    note.startswith(
+                        (
+                            "GitHub write permission denied",
+                            "Failed to publish fix",
+                            "Unexpected error publishing fix",
+                        )
+                    )
+                    for note in notes
+                )
                 if result_state.get("__interrupt__"):
                     run.status = RunStatus.AWAITING_APPROVAL
                 elif result_state.get("published_pr_url"):
@@ -100,7 +110,7 @@ class ApproveRun:
                 elif decision == ApprovalDecision.REJECT:
                     run.status = RunStatus.REJECTED
                     run.approval = decision
-                elif proposal and proposal.status == FixStatus.FAILED:
+                elif publish_failed or (proposal and proposal.status == FixStatus.FAILED):
                     run.status = RunStatus.FAILED
                 else:
                     run.status = RunStatus.READY_TO_MERGE

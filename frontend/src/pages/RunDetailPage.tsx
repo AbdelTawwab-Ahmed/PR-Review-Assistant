@@ -248,6 +248,35 @@ export const RunDetailPage: React.FC = () => {
         </div>
       )}
 
+      {/* Failure / Permission Denied Banner */}
+      {run.status === 'failed' && (
+        <div
+          className="hitl-banner-elevated"
+          style={{
+            borderColor: 'rgba(239, 68, 68, 0.45)',
+            background: 'linear-gradient(135deg, rgba(239, 68, 68, 0.1), rgba(127, 29, 29, 0.18))',
+          }}
+        >
+          <div className="hitl-badge-pulse" style={{ background: 'rgba(239, 68, 68, 0.18)' }}>
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#EF4444" strokeWidth="2.2">
+              <circle cx="12" cy="12" r="10" />
+              <line x1="12" y1="8" x2="12" y2="12" />
+              <line x1="12" y1="16" x2="12.01" y2="16" />
+            </svg>
+          </div>
+          <div className="hitl-content">
+            <h3 className="hitl-headline" style={{ color: '#FCA5A5' }}>
+              Action Could Not Complete on GitHub
+            </h3>
+            <p className="hitl-body">
+              {run.notes && run.notes.length > 0
+                ? run.notes[run.notes.length - 1]
+                : 'The workflow failed to complete. Inspect the generated fix proposal and review notes below.'}
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Stage 1: Initial Remediation Authorization Gate */}
       {isAwaitingPlan && (
         <div className="hitl-banner-elevated">

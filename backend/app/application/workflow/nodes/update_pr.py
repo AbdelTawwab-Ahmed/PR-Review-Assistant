@@ -1,6 +1,7 @@
 import logging
 from typing import Any
 
+from app.application.ports.github_port import GitHubError
 from app.application.use_cases.publish_fix import FixPublishError, PublishFix
 from app.application.workflow.state import ReviewState
 from app.domain.enums import ApprovalDecision, FixStatus
@@ -53,6 +54,18 @@ def make_update_pr(publisher: PublishFix | None, *, allow_unverified: bool = Fal
         except FixPublishError as exc:
             logger.warning("Failed to publish fix: %s", exc)
             return {"notes": [f"Failed to publish fix: {exc}"]}
+        except GitHubError as exc:
+            if exc.status_code in (401, 403, 404):
+                msg = (
+                    f"GitHub write permission denied (HTTP {exc.status_code}): "
+                    "the configured GitHub token does not have contributor/push access "
+                    "to create branches or pull requests on this repository. "
+                    "You can still review and copy the generated fix diff below."
+                )
+            else:
+                msg = f"Failed to publish fix on GitHub: {exc}"
+            logger.warning("Failed to publish fix: %s", msg)
+            return {"notes": [msg]}
         except Exception as exc:
             logger.exception("Unexpected error publishing fix: %s", exc)
             return {"notes": [f"Unexpected error publishing fix: {exc}"]}
