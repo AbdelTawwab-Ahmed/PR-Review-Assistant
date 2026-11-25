@@ -2,11 +2,6 @@ import React, { useState, useEffect } from 'react';
 
 export const SettingsPage: React.FC = () => {
   const [healthData, setHealthData] = useState<{ status: string; cache?: string } | null>(null);
-  const [copiedWebhook, setCopiedWebhook] = useState(false);
-  const [copiedSecret, setCopiedSecret] = useState(false);
-
-  const webhookUrl = 'https://gpgai2-ghdvf7b6caetf3ds.westus3-01.azurewebsites.net/api/webhooks/github';
-  const webhookSecret = '••••••••••••••••••••••••••••••••';
 
   useEffect(() => {
     fetch('/api/health/ready')
@@ -14,12 +9,6 @@ export const SettingsPage: React.FC = () => {
       .then(setHealthData)
       .catch(() => setHealthData({ status: 'unhealthy' }));
   }, []);
-
-  const copyToClipboard = (text: string, setCopied: (v: boolean) => void) => {
-    navigator.clipboard.writeText(text);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
 
   return (
     <div className="settings-page">
@@ -82,50 +71,6 @@ export const SettingsPage: React.FC = () => {
               <span className="config-key">Checkpointer:</span>
               <code className="config-val">PostgresSaver (LangGraph v2.0)</code>
             </div>
-          </div>
-        </div>
-
-        {/* GitHub Webhook Configuration Card */}
-        <div className="settings-card full-width">
-          <div className="card-top-row">
-            <span className="card-service-icon">🪝</span>
-            <span className="service-status-pill online">Ready</span>
-          </div>
-          <h3 className="card-service-title">GitHub Webhook Integration</h3>
-          <p className="card-service-desc">
-            Configure this webhook in any GitHub repository settings to receive automated instant reviews on pull request events.
-          </p>
-
-          <div className="webhook-field-group">
-            <label className="field-label">Payload URL</label>
-            <div className="copy-input-row">
-              <input type="text" readOnly value={webhookUrl} className="readonly-input" />
-              <button
-                type="button"
-                onClick={() => copyToClipboard(webhookUrl, setCopiedWebhook)}
-                className="btn btn-secondary btn-sm"
-              >
-                {copiedWebhook ? 'Copied! ✓' : 'Copy'}
-              </button>
-            </div>
-          </div>
-
-          <div className="webhook-field-group">
-            <label className="field-label">Webhook Secret (HMAC SHA-256)</label>
-            <div className="copy-input-row">
-              <input type="text" readOnly value={webhookSecret} className="readonly-input" />
-              <button
-                type="button"
-                onClick={() => copyToClipboard(webhookSecret, setCopiedSecret)}
-                className="btn btn-secondary btn-sm"
-              >
-                {copiedSecret ? 'Copied! ✓' : 'Copy'}
-              </button>
-            </div>
-          </div>
-
-          <div className="webhook-instructions">
-            <strong>Required Events:</strong> Select <code>Let me select individual events</code> &rarr; check <code>Pull requests</code>. Secret is configured securely in Azure backend.
           </div>
         </div>
       </div>
