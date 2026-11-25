@@ -24,18 +24,6 @@ export const Header: React.FC = () => {
           <span className="pulse-indicator" />
           <span>Azure Multi-Agent Swarm</span>
         </div>
-
-        <div className="header-user">
-          <img
-            src="https://avatars.githubusercontent.com/u/114743475?v=4"
-            alt="User Avatar"
-            className="user-avatar"
-          />
-          <div className="user-info">
-            <span className="user-name">AbdelTawwab-Ahmed</span>
-            <span className="user-role">Lead Engineer</span>
-          </div>
-        </div>
       </div>
     </header>
   );
