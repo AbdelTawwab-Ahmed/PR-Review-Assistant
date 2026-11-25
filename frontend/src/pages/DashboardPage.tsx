@@ -207,7 +207,7 @@ export const DashboardPage: React.FC = () => {
       {/* KPI Stats Overview */}
       <div className="dashboard-stats-wrapper">
         <h3 className="section-label-header">SYSTEM OVERVIEW</h3>
-        <StatsOverview runs={runs || []} />
+        <StatsOverview runs={recentRuns} />
       </div>
 
       {/* Recent Analysis Runs Table */}
