@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { useRuns } from '../hooks/useRuns';
 import { analyzeRepository } from '../api/repos';
+import { useDashboardState } from '../context/dashboardState';
 import { RepoSelector } from '../components/RepoSelector';
 import { LiveAnalysisTracker } from '../components/LiveAnalysisTracker';
 import { StatsOverview } from '../components/StatsOverview';
@@ -15,15 +16,24 @@ export const DashboardPage: React.FC = () => {
   const { data: runs, isLoading: isRunsLoading, refetch } = useRuns();
 
   const trackerRef = React.useRef<HTMLDivElement>(null);
-  const [activeAnalysis, setActiveAnalysis] = useState<{
-    runId: string;
-    repo: string;
-    prNumber: number;
-  } | null>(null);
+  const {
+    activeAnalysis,
+    setActiveAnalysis,
+    isAnalyzing,
+    setIsAnalyzing,
+    completedRun,
+    setCompletedRun,
+    analysisError,
+    setAnalysisError,
+    sessionRunIds,
+    registerSessionRun,
+  } = useDashboardState();
 
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [completedRun, setCompletedRun] = useState<RunDetail | null>(null);
-  const [analysisError, setAnalysisError] = useState<string | null>(null);
+  const recentRuns = useMemo(() => {
+    if (!runs || sessionRunIds.length === 0) return [];
+    const allowed = new Set(sessionRunIds);
+    return runs.filter((r) => allowed.has(r.id));
+  }, [runs, sessionRunIds]);
 
   const handleStartAnalyze = async (repo: string, prNumber?: number) => {
     setAnalysisError(null);
@@ -42,6 +52,7 @@ export const DashboardPage: React.FC = () => {
 
     try {
       const res = await analyzeRepository(repo, prNumber);
+      registerSessionRun(res.run_id);
       setActiveAnalysis({
         runId: res.run_id,
         repo: res.repo,
@@ -61,6 +72,7 @@ export const DashboardPage: React.FC = () => {
   const handleAnalysisCompleted = (detail: RunDetail) => {
     setIsAnalyzing(false);
     setCompletedRun(detail);
+    registerSessionRun(detail.run_id);
     refetch();
   };
 
@@ -207,12 +219,12 @@ export const DashboardPage: React.FC = () => {
           </Link>
         </div>
 
-        {isRunsLoading ? (
+        {isRunsLoading && sessionRunIds.length > 0 ? (
           <div className="glass-loading-state">
             <div className="spinner" />
             <p className="loading-label">Fetching review history...</p>
           </div>
-        ) : !runs || runs.length === 0 ? (
+        ) : recentRuns.length === 0 ? (
           <div className="empty-runs-state">
             <div className="empty-icon-circle">
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -237,7 +249,7 @@ export const DashboardPage: React.FC = () => {
                 </tr>
               </thead>
               <tbody>
-                {runs.slice(0, 8).map((r) => (
+                {recentRuns.slice(0, 8).map((r) => (
                   <tr key={r.id} className="table-row">
                     <td>
                       <div className="repo-cell">

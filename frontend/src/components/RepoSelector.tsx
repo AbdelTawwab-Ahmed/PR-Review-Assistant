@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { getRepoDetails, type RepoDetailsResponse } from '../api/repos';
+import { getRepoDetails } from '../api/repos';
+import { useDashboardState } from '../context/dashboardState';
 
 interface RepoSelectorProps {
   onAnalyze: (repo: string, prNumber?: number) => void;
@@ -7,17 +8,26 @@ interface RepoSelectorProps {
 }
 
 export const RepoSelector: React.FC<RepoSelectorProps> = ({ onAnalyze, isAnalyzing }) => {
-  const [inputVal, setInputVal] = useState('');
-  const [selectedRepo, setSelectedRepo] = useState<string>('');
-  const [selectedPr, setSelectedPr] = useState<number | undefined>(undefined);
+  const {
+    inputVal,
+    setInputVal,
+    selectedRepo,
+    setSelectedRepo,
+    selectedPr,
+    setSelectedPr,
+    repoDetails,
+    setRepoDetails,
+  } = useDashboardState();
 
-  const [repoDetails, setRepoDetails] = useState<RepoDetailsResponse | null>(null);
   const [isLoadingDetails, setIsLoadingDetails] = useState(false);
   const [validationError, setValidationError] = useState<string | null>(null);
 
-  // Fetch repository details whenever selectedRepo changes
+  // Fetch repository details whenever selectedRepo changes and isn't already loaded
   useEffect(() => {
     if (!selectedRepo || !selectedRepo.includes('/')) return;
+    if (repoDetails?.repo.full_name.toLowerCase() === selectedRepo.toLowerCase()) {
+      return;
+    }
 
     let isMounted = true;
     const timer = setTimeout(() => {
@@ -52,7 +62,7 @@ export const RepoSelector: React.FC<RepoSelectorProps> = ({ onAnalyze, isAnalyzi
       isMounted = false;
       clearTimeout(timer);
     };
-  }, [selectedRepo]);
+  }, [selectedRepo, repoDetails, setRepoDetails, setSelectedPr]);
 
   // Clean and parse repository string
   const parseRepoString = (raw: string): { repo: string; prNum?: number } | null => {
@@ -93,6 +103,9 @@ export const RepoSelector: React.FC<RepoSelectorProps> = ({ onAnalyze, isAnalyzi
     } else if (val.trim()) {
       setValidationError('Please enter a valid GitHub repository (e.g. owner/repo or https://github.com/owner/repo)');
     } else {
+      setSelectedRepo('');
+      setSelectedPr(undefined);
+      setRepoDetails(null);
       setValidationError(null);
     }
   };
