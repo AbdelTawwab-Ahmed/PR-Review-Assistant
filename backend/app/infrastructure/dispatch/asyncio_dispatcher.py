@@ -86,7 +86,11 @@ class AsyncioRunDispatcher:
             if llm_analysis_failed:
                 run.status = RunStatus.FAILED
                 await self._repository.save(run)
-                logger.error("Run %s failed because LLM analysis could not complete: %s", run_id, result.notes)
+                logger.error(
+                    "Run %s failed because LLM analysis could not complete: %s",
+                    run_id,
+                    result.notes,
+                )
                 return
 
             if result.awaiting_approval:

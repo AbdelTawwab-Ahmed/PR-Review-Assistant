@@ -29,7 +29,8 @@ def make_analyze_chunk(agents: Mapping[str, ChunkAnalysisAgent]):
         except LLMError as exc:
             logger.warning("%s failed on a chunk: %s", agent.name, exc)
             # One failed call must not sink the whole run; record it so the report is honest.
-            return {"notes": [f"{agent.name} could not analyze {len(task['chunk'])} file(s): {exc}"]}
+            count = len(task["chunk"])
+            return {"notes": [f"{agent.name} could not analyze {count} file(s): {exc}"]}
         return {"findings": findings}
 
     return analyze_chunk
