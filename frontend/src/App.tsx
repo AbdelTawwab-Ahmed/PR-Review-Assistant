@@ -1,5 +1,4 @@
-import { useEffect } from 'react';
-import { Routes, Route, useNavigate } from 'react-router-dom';
+import { Routes, Route } from 'react-router-dom';
 import { Sidebar } from './components/Sidebar';
 import { Header } from './components/Header';
 import { DashboardStateProvider } from './context/DashboardStateProvider';
@@ -10,17 +9,6 @@ import { SettingsPage } from './pages/SettingsPage';
 import { RunDetailPage } from './pages/RunDetailPage';
 
 export default function App() {
-  const navigate = useNavigate();
-
-  useEffect(() => {
-    const navEntry = performance.getEntriesByType('navigation')[0] as
-      | PerformanceNavigationTiming
-      | undefined;
-    if (navEntry?.type === 'reload' && window.location.pathname !== '/') {
-      navigate('/', { replace: true });
-    }
-  }, [navigate]);
-
   return (
     <DashboardStateProvider>
       <div className="saas-app-layout">
