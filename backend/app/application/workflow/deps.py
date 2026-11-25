@@ -22,6 +22,7 @@ class WorkflowDeps:
     fix_min_severity: Severity = Severity.MEDIUM
     fix_max_files: int = 5
     publisher: PublishFix | None = None
+    allow_unverified_fixes: bool = False
 
     @property
     def static_analysis_enabled(self) -> bool:

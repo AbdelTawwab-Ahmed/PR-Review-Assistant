@@ -101,67 +101,36 @@ async def get_run(
     use_case: GetRunStatusDep,
     repository: RunRepoOptDep = None,
 ) -> dict[str, Any]:
-    # 1. Fast Repository check
-    try:
-        run = await repository.get_by_id(run_id) if repository else None
-        if run is not None and run.status in (
-            RunStatus.READY_TO_MERGE,
-            RunStatus.AWAITING_PLAN_APPROVAL,
-            RunStatus.AWAITING_APPROVAL,
-            RunStatus.FAILED,
-            RunStatus.REJECTED,
-        ):
-            return jsonable_encoder(
-                {
-                    "run_id": run.id,
-                    "status": run.status.value if hasattr(run.status, "value") else str(run.status),
-                    "repo_full_name": run.repo_full_name,
-                    "pr_number": run.pr_number,
-                    "head_sha": run.head_sha,
-                    "findings_count": len(run.findings),
-                    "findings": [
-                        _finding_to_dict(f) if hasattr(f, "category") else f for f in run.findings
-                    ],
-                    "risk": _risk_to_dict(run.risk) if hasattr(run.risk, "level") else run.risk,
-                    "proposal": (
-                        _fix_plan_to_dict(run.fix_plan)
-                        if hasattr(run.fix_plan, "actions")
-                        else run.fix_plan
-                    ),
-                    "approval_decision": (
-                        run.approval.value
-                        if run.approval and hasattr(run.approval, "value")
-                        else None
-                    ),
-                    "published_branch": None,
-                    "published_pr_url": None,
-                    "notes": tuple(run.failure_history or ()),
-                    "interrupt_payload": None,
-                }
-            )
-    except Exception as exc:
-        logger.warning("Error fetching run from repository for %s: %s", run_id, exc)
-
-    # 2. Check LangGraph state with timeout
+    # 1. Check live LangGraph state first so Gate 1 -> Gate 2 proposals & PR URLs stay fresh
     try:
         result = await asyncio.wait_for(use_case.execute(run_id), timeout=3.0)
         result_dict = jsonable_encoder(asdict(result))
-        try:
-            if repository and ("findings" not in result_dict or not result_dict["findings"]):
+        if repository is not None:
+            try:
                 run = await repository.get_by_id(run_id)
-                if run and run.findings:
-                    result_dict["findings"] = [
-                        _finding_to_dict(f) if hasattr(f, "category") else f for f in run.findings
-                    ]
-        except Exception as exc:
-            logger.debug("Failed populating run findings fallback: %s", exc)
+                if run is not None:
+                    if result_dict.get("status") == RunStatus.ANALYZING.value and run.status in (
+                        RunStatus.FAILED,
+                        RunStatus.REJECTED,
+                        RunStatus.READY_TO_MERGE,
+                    ):
+                        result_dict["status"] = run.status.value
+                    if ("findings" not in result_dict or not result_dict["findings"]) and (
+                        run.findings
+                    ):
+                        result_dict["findings"] = [
+                            _finding_to_dict(f) if hasattr(f, "category") else f
+                            for f in run.findings
+                        ]
+            except Exception as exc:
+                logger.debug("Failed populating run findings fallback: %s", exc)
         return result_dict
     except (RunNotFoundError, TimeoutError):
         pass
     except Exception as exc:
         logger.warning("Error fetching run status from graph for %s: %s", run_id, exc)
 
-    # 3. Check Repository entity fallback
+    # 2. Check Repository entity fallback (for restarts / completed runs without graph state)
     if repository is not None:
         try:
             run = await repository.get_by_id(run_id)

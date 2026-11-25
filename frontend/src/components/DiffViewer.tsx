@@ -70,8 +70,8 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({ changes }) => {
 
   const activeFile = changes[activeFileIndex] || changes[0];
 
-  const origLines = (activeFile.original_content || '').split('\n');
-  const updatedLines = (activeFile.updated_content || '').split('\n');
+  const origLines = (activeFile.original_content ?? activeFile.old_content ?? '').split('\n');
+  const updatedLines = (activeFile.updated_content ?? activeFile.new_content ?? '').split('\n');
   const diffRows = computeLcsDiff(origLines, updatedLines);
 
   const additions = diffRows.filter((r) => r.type === 'add').length;

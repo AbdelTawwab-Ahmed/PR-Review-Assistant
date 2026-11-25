@@ -3,19 +3,27 @@ from typing import Any
 
 from app.application.use_cases.publish_fix import FixPublishError, PublishFix
 from app.application.workflow.state import ReviewState
-from app.domain.enums import ApprovalDecision
+from app.domain.enums import ApprovalDecision, FixStatus
 
 logger = logging.getLogger(__name__)
 
 
-def make_update_pr(publisher: PublishFix | None):
+def make_update_pr(publisher: PublishFix | None, *, allow_unverified: bool = False):
     async def update_pr(state: ReviewState) -> dict[str, Any]:
         decision = state.get("approval_decision")
         if decision != ApprovalDecision.APPROVE:
             return {"notes": [f"Update PR skipped (decision was {decision})"]}
 
         proposal = state.get("proposal")
-        if not proposal or not proposal.publishable:
+        is_eligible = proposal is not None and (
+            proposal.publishable
+            or (
+                allow_unverified
+                and proposal.status is FixStatus.UNVERIFIED
+                and bool(proposal.changes)
+            )
+        )
+        if not is_eligible or proposal is None:
             return {"notes": ["Update PR skipped: proposal is not publishable"]}
 
         if publisher is None:
@@ -27,6 +35,7 @@ def make_update_pr(publisher: PublishFix | None):
                 repo_full_name=state["repo_full_name"],
                 pr_number=state["pr_number"],
                 proposal=proposal,
+                allow_unverified=allow_unverified,
             )
             logger.info(
                 "Fix successfully published to %s (%s)",

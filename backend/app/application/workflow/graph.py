@@ -20,7 +20,7 @@ from app.application.workflow.nodes.score_risk import score_risk
 from app.application.workflow.nodes.static_analysis import make_static_analysis
 from app.application.workflow.nodes.update_pr import make_update_pr
 from app.application.workflow.state import ReviewState
-from app.domain.enums import ApprovalDecision
+from app.domain.enums import ApprovalDecision, FixStatus
 
 CHUNK_AGENTS = ("reviewer", "security")
 
@@ -71,11 +71,21 @@ def after_plan(state: ReviewState) -> str:
     return "apply_fixes" if plan is not None and not plan.is_empty else END
 
 
-def after_apply_fixes(state: ReviewState) -> str:
-    proposal = state.get("proposal")
-    if proposal is not None and proposal.publishable:
-        return "hitl_approval"
-    return END
+def make_after_apply_fixes(allow_unverified: bool = False):
+    def after_apply_fixes(state: ReviewState) -> str:
+        proposal = state.get("proposal")
+        if proposal is not None and (
+            proposal.publishable
+            or (
+                allow_unverified
+                and proposal.status is FixStatus.UNVERIFIED
+                and bool(proposal.changes)
+            )
+        ):
+            return "hitl_approval"
+        return END
+
+    return after_apply_fixes
 
 
 def after_hitl(state: ReviewState) -> str:
@@ -121,14 +131,21 @@ def build_analysis_graph(deps: WorkflowDeps, checkpointer: Any = None):
         graph.add_node("plan_fixes", make_plan_fixes(deps.fix_min_severity, deps.fix_max_files))
         graph.add_node("apply_fixes", make_apply_fixes(deps.fix_engine))
         graph.add_node("hitl_approval", make_hitl_approval())
-        graph.add_node("update_pr", make_update_pr(deps.publisher))
+        graph.add_node(
+            "update_pr",
+            make_update_pr(deps.publisher, allow_unverified=deps.allow_unverified_fixes),
+        )
 
         graph.add_conditional_edges(
             "score_risk", after_risk, ["hitl_plan_approval", "plan_fixes", END]
         )
         graph.add_conditional_edges("hitl_plan_approval", after_plan_approval, ["plan_fixes", END])
         graph.add_conditional_edges("plan_fixes", after_plan, ["apply_fixes", END])
-        graph.add_conditional_edges("apply_fixes", after_apply_fixes, ["hitl_approval", END])
+        graph.add_conditional_edges(
+            "apply_fixes",
+            make_after_apply_fixes(deps.allow_unverified_fixes),
+            ["hitl_approval", END],
+        )
         graph.add_conditional_edges("hitl_approval", after_hitl, ["update_pr", "plan_fixes", END])
         graph.add_edge("update_pr", END)
     else:

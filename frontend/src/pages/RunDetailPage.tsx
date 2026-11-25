@@ -222,6 +222,32 @@ export const RunDetailPage: React.FC = () => {
         </div>
       )}
 
+      {/* Published Fix PR Banner */}
+      {run.published_pr_url && (
+        <div className="hitl-banner-elevated" style={{ borderColor: 'rgba(16, 185, 129, 0.45)', background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.12), rgba(6, 78, 59, 0.2))' }}>
+          <div className="hitl-badge-pulse" style={{ background: 'rgba(16, 185, 129, 0.2)' }}>
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#10B981" strokeWidth="2.2">
+              <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+              <polyline points="22 4 12 14.01 9 11.01" />
+            </svg>
+          </div>
+          <div className="hitl-content">
+            <h3 className="hitl-headline" style={{ color: '#10B981' }}>Fix Pull Request Published on GitHub</h3>
+            <p className="hitl-body">
+              Remediation changes were committed to branch <code>{run.published_branch}</code> and a new Pull Request was opened for final merge.
+            </p>
+          </div>
+          <a
+            href={run.published_pr_url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="btn btn-primary btn-authorize-glow"
+          >
+            Open Fix Pull Request &rarr;
+          </a>
+        </div>
+      )}
+
       {/* Stage 1: Initial Remediation Authorization Gate */}
       {isAwaitingPlan && (
         <div className="hitl-banner-elevated">
@@ -357,7 +383,7 @@ export const RunDetailPage: React.FC = () => {
                 </div>
                 <h4 className="rationale-title">Optimization Rationale</h4>
                 <p className="rationale-text">
-                  {run.proposal.plan_summary || run.proposal.explanation || 'Autonomous code remediation proposed to resolve static analysis findings.'}
+                  {run.proposal.summary || run.proposal.plan_summary || run.proposal.explanation || 'Autonomous code remediation proposed to resolve static analysis findings.'}
                 </p>
               </div>
             )}

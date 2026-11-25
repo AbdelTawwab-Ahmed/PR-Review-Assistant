@@ -44,8 +44,10 @@ export interface Finding {
 
 export interface FileChange {
   path: string;
-  original_content: string;
-  updated_content: string;
+  original_content?: string;
+  updated_content?: string;
+  old_content?: string;
+  new_content?: string;
 }
 
 export interface FixAction {

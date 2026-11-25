@@ -3,6 +3,7 @@ from dataclasses import dataclass
 from app.application.ports.github_port import FileUpdate, GitHubError, GitHubPort
 from app.domain.entities.fix_proposal import FixProposal
 from app.domain.entities.pull_request import PullRequest
+from app.domain.enums import FixStatus
 from app.domain.services.branches import fix_branch_name
 
 MAX_BODY_CHARS = 6000
@@ -51,9 +52,17 @@ class PublishFix:
         self._github = github
 
     async def execute(
-        self, repo_full_name: str, pr_number: int, proposal: FixProposal
+        self,
+        repo_full_name: str,
+        pr_number: int,
+        proposal: FixProposal,
+        *,
+        allow_unverified: bool = False,
     ) -> PublishedFix:
-        if not proposal.publishable:
+        is_allowed = proposal.publishable or (
+            allow_unverified and proposal.status is FixStatus.UNVERIFIED and bool(proposal.changes)
+        )
+        if not is_allowed:
             raise FixPublishError("the proposal has no changes that can be published")
         pr = await self._github.get_pull_request(repo_full_name, pr_number)
         if pr.from_fork:

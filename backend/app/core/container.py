@@ -202,6 +202,7 @@ def build_container(settings: Settings) -> Container:
             fix_min_severity=settings.fix_min_severity,
             fix_max_files=settings.fix_max_files,
             publisher=publisher,
+            allow_unverified_fixes=not settings.sandbox_enabled,
         ),
         checkpointer=checkpointer_manager.checkpointer,
     )
@@ -228,7 +229,7 @@ def build_container(settings: Settings) -> Container:
         analysis=analysis,
         token_tracker=tracker,
         checkpointer_manager=checkpointer_manager,
-        approve_run=ApproveRun(graph),
+        approve_run=ApproveRun(graph, run_repository),
         get_run_status=GetRunStatus(graph),
         run_repository=run_repository,
         telemetry=telemetry,

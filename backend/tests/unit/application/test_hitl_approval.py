@@ -213,3 +213,59 @@ async def test_stage_1_plan_approval_interrupt() -> None:
     interrupts = [i.value for t in state_snapshot.tasks for i in t.interrupts]
     assert len(interrupts) == 1
     assert interrupts[0]["status"] == "awaiting_plan_approval"
+
+
+async def test_unverified_fix_reaches_gate2_and_publishes_when_allowed() -> None:
+    pr = make_pr()
+    gh = FakePublisherGitHub(pr)
+    unverified_proposal = FixProposal(
+        status=FixStatus.UNVERIFIED,
+        base_sha="abc123",
+        changes=(FileChange("src/a.py", "old", "new"),),
+        summary="syntax-checked fix without sandbox",
+    )
+    engine = FakeEngine(unverified_proposal)
+    checkpointer = MemorySaver()
+    graph = build_analysis_graph(
+        WorkflowDeps(
+            github=gh,
+            llm=llm_with_finding(),
+            fix_engine=engine,
+            publisher=PublishFix(gh),
+            allow_unverified_fixes=True,
+        ),
+        checkpointer=checkpointer,
+    )
+
+    from app.domain.entities.review_run import ReviewRun
+    from app.infrastructure.persistence.repositories import InMemoryReviewRunRepository
+
+    repo = InMemoryReviewRunRepository()
+    await repo.save(
+        ReviewRun(
+            id="run-unverified-1",
+            repo_full_name="org/repo",
+            pr_number=1,
+            head_sha="abc123",
+            status=RunStatus.AWAITING_PLAN_APPROVAL,
+        )
+    )
+
+    approve = ApproveRun(graph, repo)
+    # Simulate server restart where MemorySaver is empty, recovering from repository:
+    gate1 = await approve.execute("run-unverified-1", ApprovalDecision.APPROVE)
+    assert gate1.status == "interrupted"
+
+    saved_after_gate1 = await repo.get_by_id("run-unverified-1")
+    assert saved_after_gate1 is not None
+    assert saved_after_gate1.status == RunStatus.AWAITING_APPROVAL
+
+    # Approve Gate 2 -> should publish PR!
+    gate2 = await approve.execute("run-unverified-1", ApprovalDecision.APPROVE)
+    assert gate2.status == "completed"
+    assert gate2.published_pr_url == "https://github.com/org/repo/pull/99"
+    assert len(gh.opened_prs) == 1
+
+    saved_after_gate2 = await repo.get_by_id("run-unverified-1")
+    assert saved_after_gate2 is not None
+    assert saved_after_gate2.status == RunStatus.READY_TO_MERGE
